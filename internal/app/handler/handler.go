@@ -70,7 +70,7 @@ func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(key))
 }
 
-func (c *Container) GetUrlLink(w http.ResponseWriter, r *http.Request) {
+func (c *Container) GetURLLink(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 
 	v, err := c.storage.Get(key)
@@ -92,7 +92,7 @@ func NewRouter(c *Container) chi.Router {
 
 	r.Post("/", c.ShortenLink)
 	r.Post("/api/shorten", c.ShortenJSONLink)
-	r.Get("/{key}", c.GetUrlLink)
+	r.Get("/{key}", c.GetURLLink)
 
 	return r
 }
