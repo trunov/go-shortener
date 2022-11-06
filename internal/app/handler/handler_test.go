@@ -111,6 +111,7 @@ func Test_GetLink(t *testing.T) {
 			r.ServeHTTP(newRecorder, req)
 
 			res := newRecorder.Result()
+			defer res.Body.Close()
 
 			if res.StatusCode == http.StatusTemporaryRedirect {
 				assert.Equal(t, res.Header.Get("Location"), tt.want.url)
