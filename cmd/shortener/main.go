@@ -29,6 +29,6 @@ func main() {
 
 	r := handler.NewRouter(c)
 
-	log.Println("server is starting on port: ", cfg.ServerAddress)
+	log.Println("server is starting on port ", cfg.ServerAddress)
 	http.ListenAndServe(cfg.ServerAddress, r)
 }
