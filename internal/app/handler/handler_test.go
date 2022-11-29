@@ -57,7 +57,7 @@ func Test_ShortenLink(t *testing.T) {
 			b, err := io.ReadAll(res.Body)
 			assert.NoError(t, err)
 
-			assert.Equal(t, len(string(b)), 8)
+			assert.Equal(t, true, strings.Contains(string(b), "http://localhost:8080"))
 			assert.Equal(t, tt.want.contentType, res.Header.Get("Content-Type"))
 		})
 	}

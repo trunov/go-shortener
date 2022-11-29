@@ -67,7 +67,9 @@ func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "plain/text")
 	w.WriteHeader(http.StatusCreated)
-	w.Write([]byte(key))
+
+	finalRes := "http://localhost:8080/" + key
+	w.Write([]byte(finalRes))
 }
 
 func (c *Container) GetURLLink(w http.ResponseWriter, r *http.Request) {
