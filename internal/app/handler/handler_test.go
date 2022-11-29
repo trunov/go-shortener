@@ -41,7 +41,7 @@ func Test_ShortenLink(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			keysAndLinks := make(map[string]string)
 			s := storage.NewStorage(keysAndLinks, "")
-			var baseURL string
+			baseURL := "http://localhost:8080"
 
 			c := NewContainer(s, baseURL)
 			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.website))
