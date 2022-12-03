@@ -131,7 +131,7 @@ func NewRouter(c *Container) chi.Router {
 	r.Post("/", c.ShortenLink)
 	r.Post("/api/shorten", c.ShortenJSONLink)
 	r.Get("/{key}", c.GetURLLink)
-	r.Get("/api/users/urls", c.GetUrlsByUserID)
+	r.Get("/api/user/urls", c.GetUrlsByUserID)
 
 	return r
 }
