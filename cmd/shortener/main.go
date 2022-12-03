@@ -8,6 +8,7 @@ import (
 	"github.com/trunov/go-shortener/internal/app/file"
 	"github.com/trunov/go-shortener/internal/app/handler"
 	"github.com/trunov/go-shortener/internal/app/storage"
+	"github.com/trunov/go-shortener/internal/app/util"
 )
 
 func main() {
@@ -16,7 +17,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	keysAndLinks := make(map[string]string)
+	keysAndLinks := make(map[string]util.MapValue)
 
 	if cfg.FileStoragePath != "" {
 		reader := file.SeedMapWithKeysAndLinks(cfg.FileStoragePath, keysAndLinks)
