@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/jackc/pgx"
 	"github.com/trunov/go-shortener/internal/app/storage"
 	"github.com/trunov/go-shortener/internal/app/util"
 
@@ -42,8 +43,9 @@ func Test_ShortenLink(t *testing.T) {
 			keysLinksUserID := make(map[string]util.MapValue)
 			s := storage.NewStorage(keysLinksUserID, "")
 			baseURL := "http://localhost:8080"
+			var conn *pgx.Conn
 
-			c := NewContainer(s, baseURL)
+			c := NewContainer(conn, s, baseURL)
 			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.website))
 
 			w := httptest.NewRecorder()
@@ -99,8 +101,9 @@ func Test_GetLink(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := storage.NewStorage(tt.keysLinksUserID, "")
 			var baseURL string
+			var conn *pgx.Conn
 
-			c := NewContainer(s, baseURL)
+			c := NewContainer(conn, s, baseURL)
 
 			r := NewRouter(c)
 

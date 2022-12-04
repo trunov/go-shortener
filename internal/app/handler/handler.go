@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"crypto/aes"
 	"encoding/json"
 	"fmt"
@@ -8,6 +9,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/jackc/pgx"
 	"github.com/trunov/go-shortener/internal/app/middleware"
 	"github.com/trunov/go-shortener/internal/app/storage"
 	"github.com/trunov/go-shortener/internal/app/util"
@@ -16,6 +18,7 @@ import (
 )
 
 type Container struct {
+	conn    *pgx.Conn
 	storage storage.Storager
 	baseURL string
 }
@@ -28,8 +31,8 @@ type Response struct {
 	Result string `json:"result"`
 }
 
-func NewContainer(storage storage.Storager, baseURL string) *Container {
-	return &Container{storage: storage, baseURL: baseURL}
+func NewContainer(conn *pgx.Conn, storage storage.Storager, baseURL string) *Container {
+	return &Container{conn: conn, storage: storage, baseURL: baseURL}
 }
 
 func (c *Container) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
@@ -116,6 +119,22 @@ func (c *Container) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (c *Container) PingDbHandler(w http.ResponseWriter, r *http.Request) {
+	if c.conn != nil {
+		err := c.conn.Ping(context.Background())
+
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+
+		w.WriteHeader(http.StatusOK)
+		return
+	}
+
+	w.WriteHeader(http.StatusInternalServerError)
+}
+
 func NewRouter(c *Container) chi.Router {
 	r := chi.NewRouter()
 
@@ -132,6 +151,7 @@ func NewRouter(c *Container) chi.Router {
 	r.Post("/api/shorten", c.ShortenJSONLink)
 	r.Get("/{key}", c.GetURLLink)
 	r.Get("/api/user/urls", c.GetUrlsByUserID)
+	r.Get("/ping", c.PingDbHandler)
 
 	return r
 }
