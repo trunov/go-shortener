@@ -119,7 +119,7 @@ func (c *Container) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (c *Container) PingDbHandler(w http.ResponseWriter, r *http.Request) {
+func (c *Container) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	if c.conn != nil {
 		err := c.conn.Ping(context.Background())
 
@@ -151,7 +151,7 @@ func NewRouter(c *Container) chi.Router {
 	r.Post("/api/shorten", c.ShortenJSONLink)
 	r.Get("/{key}", c.GetURLLink)
 	r.Get("/api/user/urls", c.GetUrlsByUserID)
-	r.Get("/ping", c.PingDbHandler)
+	r.Get("/ping", c.PingDBHandler)
 
 	return r
 }
