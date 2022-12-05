@@ -12,6 +12,7 @@ import (
 	"github.com/trunov/go-shortener/internal/app/handler"
 	"github.com/trunov/go-shortener/internal/app/storage"
 	"github.com/trunov/go-shortener/internal/app/util"
+	"github.com/trunov/go-shortener/migrate"
 )
 
 func StartServer(cfg config.Config) {
@@ -36,6 +37,11 @@ func StartServer(cfg config.Config) {
 			os.Exit(1)
 		}
 		defer conn.Close()
+
+		err = migrate.Migrate(cfg.DatabaseDSN, migrate.Migrations)
+		if err != nil {
+			log.Fatal(err)
+		}
 	}
 
 	s := storage.NewStorage(keysAndLinks, cfg.FileStoragePath)

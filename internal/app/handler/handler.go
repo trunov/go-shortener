@@ -78,7 +78,14 @@ func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
 
 	key := util.GenerateRandomString()
 
-	c.storage.Add(key, string(b), userID)
+	if c.conn != nil {
+		_, err := c.conn.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, string(b), userID)
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		c.storage.Add(key, string(b), userID)
+	}
 
 	w.Header().Set("Content-Type", "plain/text")
 	w.WriteHeader(http.StatusCreated)
