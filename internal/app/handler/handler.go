@@ -109,11 +109,21 @@ func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
 func (c *Container) GetURLLink(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 
-	v, err := c.storage.Get(key)
+	var v string
+	if c.conn != nil {
+		err := c.conn.QueryRow("SELECT original_url from shortener WHERE short_url = $1", key).Scan(&v)
+		if err == pgx.ErrNoRows {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
+	} else {
+		var err error
+		v, err = c.storage.Get(key)
 
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
-		return
+		if err != nil {
+			http.Error(w, err.Error(), http.StatusNotFound)
+			return
+		}
 	}
 
 	w.Header().Set("Location", v)
