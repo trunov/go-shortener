@@ -24,7 +24,7 @@ type Container struct {
 }
 
 type BatchRequest struct {
-	CorrelationId string `json:"correlation_id"`
+	CorrelationID string `json:"correlation_id"`
 	OriginalURL   string `json:"original_url"`
 }
 
@@ -33,7 +33,7 @@ type Request struct {
 }
 
 type BatchResponse struct {
-	CorrelationId string `json:"correlation_id"`
+	CorrelationID string `json:"correlation_id"`
 	ShortURL      string `json:"short_url"`
 	originalURL   string
 	userID        string
@@ -153,7 +153,7 @@ func (c *Container) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) 
 	for _, v := range batchReq {
 		key := util.GenerateRandomString()
 
-		br := BatchResponse{CorrelationId: v.CorrelationId, ShortURL: c.baseURL + "/" + key, originalURL: v.OriginalURL, userID: userID}
+		br := BatchResponse{CorrelationID: v.CorrelationID, ShortURL: c.baseURL + "/" + key, originalURL: v.OriginalURL, userID: userID}
 
 		batchRes = append(batchRes, br)
 	}
