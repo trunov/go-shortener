@@ -71,8 +71,13 @@ func (c *Container) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 
 			finalRes := c.baseURL + "/" + v
 
+			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(finalRes))
+			res := Response{Result: finalRes}
+			if err := json.NewEncoder(w).Encode(res); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
 
