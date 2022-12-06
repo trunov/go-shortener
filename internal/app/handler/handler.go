@@ -8,7 +8,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/jackc/pgx"
 	"github.com/trunov/go-shortener/internal/app/middleware"
 	"github.com/trunov/go-shortener/internal/app/storage"
@@ -56,11 +58,30 @@ func (c *Container) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID := r.Context().Value("user_id").(string)
-	fmt.Println(userID)
 
 	key := util.GenerateRandomString()
 
-	c.storage.Add(key, req.URL, userID)
+	if c.conn != nil {
+		_, err := c.conn.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, req.URL, userID)
+
+		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) {
+			var v string
+
+			c.conn.QueryRow("SELECT short_url from shortener WHERE original_url = $1", req.URL).Scan(&v)
+
+			finalRes := c.baseURL + "/" + v
+
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(finalRes))
+			return
+		}
+
+		if err != nil {
+			log.Fatal(err)
+		}
+	} else {
+		c.storage.Add(key, req.URL, userID)
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -92,6 +113,19 @@ func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
 
 	if c.conn != nil {
 		_, err := c.conn.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, string(b), userID)
+
+		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) {
+			var v string
+
+			c.conn.QueryRow("SELECT short_url from shortener WHERE original_url = $1", string(b)).Scan(&v)
+
+			finalRes := c.baseURL + "/" + v
+
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(finalRes))
+			return
+		}
+
 		if err != nil {
 			log.Fatal(err)
 		}
