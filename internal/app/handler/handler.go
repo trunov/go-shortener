@@ -190,6 +190,7 @@ func (c *Container) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) 
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(batchRes); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
