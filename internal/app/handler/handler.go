@@ -23,8 +23,20 @@ type Container struct {
 	baseURL string
 }
 
+type BatchRequest struct {
+	CorrelationId string `json:"correlation_id"`
+	OriginalURL   string `json:"original_url"`
+}
+
 type Request struct {
 	URL string `json:"URL"`
+}
+
+type BatchResponse struct {
+	CorrelationId string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+	originalURL   string
+	userID        string
 }
 
 type Response struct {
@@ -64,16 +76,16 @@ func (c *Container) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 
 func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, err.Error(), 500)
+		return
+	}
+
 	userID, ok := r.Context().Value("user_id").(string)
 
 	// without ok check first test was failing
 	if !ok {
 		fmt.Println("")
-	}
-
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
 	}
 
 	key := util.GenerateRandomString()
@@ -126,6 +138,53 @@ func (c *Container) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (c *Container) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
+	var batchReq []BatchRequest
+
+	if err := json.NewDecoder(r.Body).Decode(&batchReq); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	userID := r.Context().Value("user_id").(string)
+
+	var batchRes []BatchResponse
+
+	for _, v := range batchReq {
+		key := util.GenerateRandomString()
+
+		br := BatchResponse{CorrelationId: v.CorrelationId, ShortURL: c.baseURL + "/" + key, originalURL: v.OriginalURL, userID: userID}
+
+		batchRes = append(batchRes, br)
+	}
+
+	if c.conn != nil {
+		tx, err := c.conn.Begin()
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		defer tx.Rollback()
+
+		for _, v := range batchRes {
+			if _, err := tx.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", v.ShortURL[len(c.baseURL)+1:], v.originalURL, v.userID); err != nil {
+				log.Fatal(err)
+			}
+		}
+
+		tx.Commit()
+	} else {
+		for _, v := range batchRes {
+			c.storage.Add(v.ShortURL[len(c.baseURL)+1:], v.originalURL, v.userID)
+		}
+	}
+
+	if err := json.NewEncoder(w).Encode(batchRes); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 func (c *Container) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	if c.conn != nil {
 		err := c.conn.Ping(context.Background())
@@ -155,10 +214,17 @@ func NewRouter(c *Container) chi.Router {
 	r.Use(middleware.CookieMiddleware(key))
 
 	r.Post("/", c.ShortenLink)
-	r.Post("/api/shorten", c.ShortenJSONLink)
 	r.Get("/{key}", c.GetURLLink)
-	r.Get("/api/user/urls", c.GetUrlsByUserID)
 	r.Get("/ping", c.PingDBHandler)
+
+	r.Route("/api", func(r chi.Router) {
+		r.Get("/user/urls", c.GetUrlsByUserID)
+
+		r.Route("/shorten", func(r chi.Router) {
+			r.Post("/", c.ShortenJSONLink)
+			r.Post("/batch", c.ShortenLinksInBatch)
+		})
+	})
 
 	return r
 }
