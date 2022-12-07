@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 
 	"github.com/trunov/go-shortener/internal/app/util"
@@ -53,17 +52,17 @@ func (c *reader) ReadLinksAndKeys(keysAndLinks map[string]util.MapValue) error {
 	return nil
 }
 
-func SeedMapWithKeysAndLinks(fileStoragePath string, keysAndLinks map[string]util.MapValue) *reader {
+func SeedMapWithKeysAndLinks(fileStoragePath string, keysAndLinks map[string]util.MapValue) (*reader, error) {
 	reader, err := NewReader(fileStoragePath)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	if readerErr := reader.ReadLinksAndKeys(keysAndLinks); readerErr != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return reader
+	return reader, nil
 }
 
 type Writer struct {

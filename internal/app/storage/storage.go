@@ -25,7 +25,7 @@ type Storager interface {
 
 func (s *Storage) Get(key string) (string, error) {
 	s.mtx.RLock()
-	defer s.mtx.RLock()
+	defer s.mtx.RUnlock()
 	v, ok := s.keysAndLinks[key]
 
 	if !ok {

@@ -19,7 +19,10 @@ func StartServer(cfg config.Config) {
 	keysAndLinks := make(map[string]util.MapValue)
 
 	if cfg.FileStoragePath != "" {
-		reader := file.SeedMapWithKeysAndLinks(cfg.FileStoragePath, keysAndLinks)
+		reader, err := file.SeedMapWithKeysAndLinks(cfg.FileStoragePath, keysAndLinks)
+		if err != nil {
+			log.Fatal(err)
+		}
 		defer reader.Close()
 	}
 
