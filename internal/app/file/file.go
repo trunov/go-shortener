@@ -3,7 +3,6 @@ package file
 import (
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"os"
 
 	"github.com/trunov/go-shortener/internal/app/util"
@@ -86,9 +85,6 @@ func (p *Writer) Close() error {
 }
 
 func (p *Writer) WriteKeyLinkUserID(key, link, userID string) error {
-	// check
-	fmt.Println(link)
 	keyLinkUserID := KeyLinkUserID{Key: key, Link: link, UserID: userID}
-	fmt.Println(keyLinkUserID)
 	return p.encoder.Encode(keyLinkUserID)
 }
