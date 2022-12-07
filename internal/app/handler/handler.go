@@ -63,25 +63,24 @@ func (c *Container) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 
 	if c.conn != nil {
 		_, err := c.conn.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, req.URL, userID)
+		if err != nil {
+			if strings.Contains(err.Error(), pgerrcode.UniqueViolation) {
+				var v string
 
-		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) {
-			var v string
+				c.conn.QueryRow("SELECT short_url from shortener WHERE original_url = $1", req.URL).Scan(&v)
 
-			c.conn.QueryRow("SELECT short_url from shortener WHERE original_url = $1", req.URL).Scan(&v)
+				finalRes := c.baseURL + "/" + v
 
-			finalRes := c.baseURL + "/" + v
-
-			w.Header().Set("Content-Type", "application/json")
-			w.WriteHeader(http.StatusConflict)
-			res := Response{Result: finalRes}
-			if err := json.NewEncoder(w).Encode(res); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
+				w.Header().Set("Content-Type", "application/json")
+				w.WriteHeader(http.StatusConflict)
+				res := Response{Result: finalRes}
+				if err := json.NewEncoder(w).Encode(res); err != nil {
+					http.Error(w, err.Error(), http.StatusInternalServerError)
+					return
+				}
 				return
 			}
-			return
-		}
 
-		if err != nil {
 			log.Fatal(err)
 		}
 	} else {
@@ -119,19 +118,19 @@ func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
 	if c.conn != nil {
 		_, err := c.conn.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, string(b), userID)
 
-		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) {
-			var v string
-
-			c.conn.QueryRow("SELECT short_url from shortener WHERE original_url = $1", string(b)).Scan(&v)
-
-			finalRes := c.baseURL + "/" + v
-
-			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(finalRes))
-			return
-		}
-
 		if err != nil {
+			if strings.Contains(err.Error(), pgerrcode.UniqueViolation) {
+				var v string
+
+				c.conn.QueryRow("SELECT short_url from shortener WHERE original_url = $1", string(b)).Scan(&v)
+
+				finalRes := c.baseURL + "/" + v
+
+				w.WriteHeader(http.StatusConflict)
+				w.Write([]byte(finalRes))
+				return
+			}
+
 			log.Fatal(err)
 		}
 	} else {
