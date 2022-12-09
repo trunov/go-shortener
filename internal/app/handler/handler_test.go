@@ -7,7 +7,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trunov/go-shortener/internal/app/storage/inMemory"
+	"github.com/trunov/go-shortener/internal/app/storage/inmemory"
 	"github.com/trunov/go-shortener/internal/app/storage/postgres"
 	"github.com/trunov/go-shortener/internal/app/util"
 
@@ -41,7 +41,7 @@ func Test_ShortenLink(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			keysLinksUserID := make(map[string]util.MapValue)
-			s := inMemory.NewStorage(keysLinksUserID, "")
+			s := inmemory.NewStorage(keysLinksUserID, "")
 			var p postgres.Pinger
 			baseURL := "http://localhost:8080"
 
@@ -99,7 +99,7 @@ func Test_GetLink(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := inMemory.NewStorage(tt.keysLinksUserID, "")
+			s := inmemory.NewStorage(tt.keysLinksUserID, "")
 
 			var baseURL string
 			var p postgres.Pinger

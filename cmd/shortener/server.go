@@ -10,7 +10,7 @@ import (
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
 	"github.com/trunov/go-shortener/internal/app/handler"
-	"github.com/trunov/go-shortener/internal/app/storage/inMemory"
+	"github.com/trunov/go-shortener/internal/app/storage/inmemory"
 	"github.com/trunov/go-shortener/internal/app/storage/postgres"
 	"github.com/trunov/go-shortener/internal/app/util"
 	"github.com/trunov/go-shortener/migrate"
@@ -44,7 +44,7 @@ func StartServer(cfg config.Config) {
 		}
 		defer conn.Close()
 
-		dbStorage := postgres.NewDbStorage(conn)
+		dbStorage := postgres.NewDBStorage(conn)
 		storage = dbStorage
 		pinger = dbStorage
 
@@ -53,7 +53,7 @@ func StartServer(cfg config.Config) {
 			log.Fatal(err)
 		}
 	} else {
-		storage = inMemory.NewStorage(keysAndLinks, cfg.FileStoragePath)
+		storage = inmemory.NewStorage(keysAndLinks, cfg.FileStoragePath)
 	}
 
 	c := handler.NewHandler(storage, pinger, cfg.BaseURL)

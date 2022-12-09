@@ -18,7 +18,7 @@ type dbStorage struct {
 	conn *pgx.Conn
 }
 
-func NewDbStorage(conn *pgx.Conn) *dbStorage {
+func NewDBStorage(conn *pgx.Conn) *dbStorage {
 	return &dbStorage{conn: conn}
 }
 
