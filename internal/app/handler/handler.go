@@ -8,20 +8,24 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"strings"
 
-	"github.com/jackc/pgerrcode"
-	"github.com/jackc/pgx"
 	"github.com/trunov/go-shortener/internal/app/middleware"
-	"github.com/trunov/go-shortener/internal/app/storage"
+	"github.com/trunov/go-shortener/internal/app/storage/postgres"
 	"github.com/trunov/go-shortener/internal/app/util"
 
 	"github.com/go-chi/chi/v5"
 )
 
-type Container struct {
-	conn    *pgx.Conn
-	storage storage.Storager
+type Storager interface {
+	Get(key string) (string, error)
+	Add(key, link, userID string) string
+	GetAllLinksByUserID(userID, baseURL string) []util.AllURLSResponse
+	AddInBatch(br []util.BatchResponse, baseURL string)
+}
+
+type Handler struct {
+	storage Storager
+	pinger  postgres.Pinger
 	baseURL string
 }
 
@@ -34,22 +38,15 @@ type Request struct {
 	URL string `json:"URL"`
 }
 
-type BatchResponse struct {
-	CorrelationID string `json:"correlation_id"`
-	ShortURL      string `json:"short_url"`
-	originalURL   string
-	userID        string
-}
-
 type Response struct {
 	Result string `json:"result"`
 }
 
-func NewContainer(conn *pgx.Conn, storage storage.Storager, baseURL string) *Container {
-	return &Container{conn: conn, storage: storage, baseURL: baseURL}
+func NewHandler(storage Storager, pinger postgres.Pinger, baseURL string) *Handler {
+	return &Handler{storage: storage, pinger: pinger, baseURL: baseURL}
 }
 
-func (c *Container) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 	var req Request
 
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -61,33 +58,22 @@ func (c *Container) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 
 	key := util.GenerateRandomString()
 
-	if c.conn != nil {
-		_, err := c.conn.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, req.URL, userID)
-		if err != nil {
-			if strings.Contains(err.Error(), pgerrcode.UniqueViolation) {
-				var v string
-
-				c.conn.QueryRow("SELECT short_url from shortener WHERE original_url = $1", req.URL).Scan(&v)
-
-				finalRes := c.baseURL + "/" + v
-
-				w.Header().Set("Content-Type", "application/json")
-				w.WriteHeader(http.StatusConflict)
-				res := Response{Result: finalRes}
-				if err := json.NewEncoder(w).Encode(res); err != nil {
-					http.Error(w, err.Error(), http.StatusInternalServerError)
-					return
-				}
-				return
-			}
-
-			log.Fatal(err)
-		}
-	} else {
-		c.storage.Add(key, req.URL, userID)
-	}
+	s := c.storage.Add(key, req.URL, userID)
 
 	w.Header().Set("Content-Type", "application/json")
+
+	if s != "" {
+		finalRes := c.baseURL + "/" + s
+
+		w.WriteHeader(http.StatusConflict)
+		res := Response{Result: finalRes}
+		if err := json.NewEncoder(w).Encode(res); err != nil {
+			http.Error(w, err.Error(), http.StatusInternalServerError)
+			return
+		}
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 
 	finalRes := c.baseURL + "/" + key
@@ -99,7 +85,7 @@ func (c *Container) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) ShortenLink(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
 	if err != nil {
 		http.Error(w, err.Error(), 500)
@@ -115,70 +101,49 @@ func (c *Container) ShortenLink(w http.ResponseWriter, r *http.Request) {
 
 	key := util.GenerateRandomString()
 
-	if c.conn != nil {
-		_, err := c.conn.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, string(b), userID)
-
-		if err != nil {
-			if strings.Contains(err.Error(), pgerrcode.UniqueViolation) {
-				var v string
-
-				c.conn.QueryRow("SELECT short_url from shortener WHERE original_url = $1", string(b)).Scan(&v)
-
-				finalRes := c.baseURL + "/" + v
-
-				w.WriteHeader(http.StatusConflict)
-				w.Write([]byte(finalRes))
-				return
-			}
-
-			log.Fatal(err)
-		}
-	} else {
-		c.storage.Add(key, string(b), userID)
-	}
+	s := c.storage.Add(key, string(b), userID)
 
 	w.Header().Set("Content-Type", "plain/text")
+
+	if s != "" {
+		finalRes := c.baseURL + "/" + s
+
+		w.WriteHeader(http.StatusConflict)
+		w.Write([]byte(finalRes))
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 
 	finalRes := c.baseURL + "/" + key
 	w.Write([]byte(finalRes))
 }
 
-func (c *Container) GetURLLink(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) GetURLLink(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 
-	var v string
-	if c.conn != nil {
-		err := c.conn.QueryRow("SELECT original_url from shortener WHERE short_url = $1", key).Scan(&v)
-		if err == pgx.ErrNoRows {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
-	} else {
-		var err error
-		v, err = c.storage.Get(key)
+	v, err := c.storage.Get(key)
 
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusNotFound)
-			return
-		}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusNotFound)
+		return
 	}
 
 	w.Header().Set("Location", v)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
-func (c *Container) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 
-	allURLSByUserID := util.FindAllURLSByUserID(c.storage.GetAll(), userID, c.baseURL)
+	allURLSByUserID := c.storage.GetAllLinksByUserID(userID, c.baseURL)
+
+	w.Header().Set("Content-Type", "application/json")
 
 	if len(allURLSByUserID) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-
-	w.Header().Set("Content-Type", "application/json")
 
 	if err := json.NewEncoder(w).Encode(allURLSByUserID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -186,7 +151,7 @@ func (c *Container) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func (c *Container) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
+func (c *Handler) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
 	var batchReq []BatchRequest
 
 	if err := json.NewDecoder(r.Body).Decode(&batchReq); err != nil {
@@ -196,36 +161,15 @@ func (c *Container) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) 
 
 	userID := r.Context().Value("user_id").(string)
 
-	var batchRes []BatchResponse
+	var batchRes []util.BatchResponse
 
 	for _, v := range batchReq {
 		key := util.GenerateRandomString()
-
-		br := BatchResponse{CorrelationID: v.CorrelationID, ShortURL: c.baseURL + "/" + key, originalURL: v.OriginalURL, userID: userID}
-
+		br := util.BatchResponse{CorrelationID: v.CorrelationID, ShortURL: c.baseURL + "/" + key, OriginalURL: v.OriginalURL, UserID: userID}
 		batchRes = append(batchRes, br)
 	}
 
-	if c.conn != nil {
-		tx, err := c.conn.Begin()
-		if err != nil {
-			log.Fatal(err)
-		}
-
-		defer tx.Rollback()
-
-		for _, v := range batchRes {
-			if _, err := tx.Exec("INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", v.ShortURL[len(c.baseURL)+1:], v.originalURL, v.userID); err != nil {
-				log.Fatal(err)
-			}
-		}
-
-		tx.Commit()
-	} else {
-		for _, v := range batchRes {
-			c.storage.Add(v.ShortURL[len(c.baseURL)+1:], v.originalURL, v.userID)
-		}
-	}
+	c.storage.AddInBatch(batchRes, c.baseURL)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -236,23 +180,22 @@ func (c *Container) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) 
 	}
 }
 
-func (c *Container) PingDBHandler(w http.ResponseWriter, r *http.Request) {
-	if c.conn != nil {
-		err := c.conn.Ping(context.Background())
-
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-
-		w.WriteHeader(http.StatusOK)
+func (c *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
+	if c.pinger == nil {
+		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
 
-	w.WriteHeader(http.StatusInternalServerError)
+	if err := c.pinger.Ping(context.Background()); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	} else {
+		w.WriteHeader(http.StatusOK)
+		return
+	}
 }
 
-func NewRouter(c *Container) chi.Router {
+func NewRouter(c *Handler) chi.Router {
 	r := chi.NewRouter()
 
 	key, err := util.GenerateRandom(2 * aes.BlockSize)

@@ -7,6 +7,15 @@ import (
 	"time"
 )
 
+type KeysLinksUserID map[string]MapValue
+
+type BatchResponse struct {
+	CorrelationID string `json:"correlation_id"`
+	ShortURL      string `json:"short_url"`
+	OriginalURL   string `json:"-"`
+	UserID        string `json:"-"`
+}
+
 type MapValue struct {
 	Link   string
 	UserID string

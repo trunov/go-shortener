@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/jackc/pgx"
-	"github.com/trunov/go-shortener/internal/app/storage"
+	"github.com/trunov/go-shortener/internal/app/storage/inMemory"
+	"github.com/trunov/go-shortener/internal/app/storage/postgres"
 	"github.com/trunov/go-shortener/internal/app/util"
 
 	"github.com/stretchr/testify/assert"
@@ -41,11 +41,11 @@ func Test_ShortenLink(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			keysLinksUserID := make(map[string]util.MapValue)
-			s := storage.NewStorage(keysLinksUserID, "")
+			s := inMemory.NewStorage(keysLinksUserID, "")
+			var p postgres.Pinger
 			baseURL := "http://localhost:8080"
-			var conn *pgx.Conn
 
-			c := NewContainer(conn, s, baseURL)
+			c := NewHandler(s, p, baseURL)
 			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.website))
 
 			w := httptest.NewRecorder()
@@ -99,11 +99,12 @@ func Test_GetLink(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewStorage(tt.keysLinksUserID, "")
-			var baseURL string
-			var conn *pgx.Conn
+			s := inMemory.NewStorage(tt.keysLinksUserID, "")
 
-			c := NewContainer(conn, s, baseURL)
+			var baseURL string
+			var p postgres.Pinger
+
+			c := NewHandler(s, p, baseURL)
 
 			r := NewRouter(c)
 
