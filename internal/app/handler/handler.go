@@ -8,7 +8,9 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"strings"
 
+	"github.com/jackc/pgerrcode"
 	"github.com/trunov/go-shortener/internal/app/middleware"
 	"github.com/trunov/go-shortener/internal/app/storage/postgres"
 	"github.com/trunov/go-shortener/internal/app/util"
@@ -18,9 +20,10 @@ import (
 
 type Storager interface {
 	Get(key string) (string, error)
-	Add(key, link, userID string) string
-	GetAllLinksByUserID(userID, baseURL string) []util.AllURLSResponse
-	AddInBatch(br []util.BatchResponse, baseURL string)
+	Add(key, link, userID string) error
+	GetAllLinksByUserID(userID, baseURL string) ([]util.AllURLSResponse, error)
+	AddInBatch(br []util.BatchResponse, baseURL string) (string, error)
+	GetShortenKey(originalURL string) (string, error)
 }
 
 type Handler struct {
@@ -58,19 +61,29 @@ func (c *Handler) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 
 	key := util.GenerateRandomString()
 
-	s := c.storage.Add(key, req.URL, userID)
+	err := c.storage.Add(key, req.URL, userID)
 
 	w.Header().Set("Content-Type", "application/json")
 
-	if s != "" {
-		finalRes := c.baseURL + "/" + s
+	if err != nil {
+		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
+			k, err := c.storage.GetShortenKey(req.URL)
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 
-		w.WriteHeader(http.StatusConflict)
-		res := Response{Result: finalRes}
-		if err := json.NewEncoder(w).Encode(res); err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
+			finalRes := c.baseURL + "/" + k
+
+			w.WriteHeader(http.StatusConflict)
+			res := Response{Result: finalRes}
+			if err := json.NewEncoder(w).Encode(res); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
 			return
 		}
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -101,15 +114,25 @@ func (c *Handler) ShortenLink(w http.ResponseWriter, r *http.Request) {
 
 	key := util.GenerateRandomString()
 
-	s := c.storage.Add(key, string(b), userID)
+	err = c.storage.Add(key, string(b), userID)
 
 	w.Header().Set("Content-Type", "plain/text")
 
-	if s != "" {
-		finalRes := c.baseURL + "/" + s
+	if err != nil {
+		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
+			k, err := c.storage.GetShortenKey(string(b))
+			if err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			finalRes := c.baseURL + "/" + k
 
-		w.WriteHeader(http.StatusConflict)
-		w.Write([]byte(finalRes))
+			w.WriteHeader(http.StatusConflict)
+			w.Write([]byte(finalRes))
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -136,9 +159,14 @@ func (c *Handler) GetURLLink(w http.ResponseWriter, r *http.Request) {
 func (c *Handler) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 
-	allURLSByUserID := c.storage.GetAllLinksByUserID(userID, c.baseURL)
+	allURLSByUserID, err := c.storage.GetAllLinksByUserID(userID, c.baseURL)
 
 	w.Header().Set("Content-Type", "application/json")
+
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	if len(allURLSByUserID) == 0 {
 		w.WriteHeader(http.StatusNoContent)
@@ -169,9 +197,27 @@ func (c *Handler) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
 		batchRes = append(batchRes, br)
 	}
 
-	c.storage.AddInBatch(batchRes, c.baseURL)
-
 	w.Header().Set("Content-Type", "application/json")
+
+	k, err := c.storage.AddInBatch(batchRes, c.baseURL)
+	if err != nil {
+		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
+			finalRes := c.baseURL + "/" + k
+
+			w.WriteHeader(http.StatusConflict)
+
+			res := Response{Result: finalRes}
+			if err := json.NewEncoder(w).Encode(res); err != nil {
+				http.Error(w, err.Error(), http.StatusInternalServerError)
+				return
+			}
+			return
+		}
+
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
 	w.WriteHeader(http.StatusCreated)
 
 	if err := json.NewEncoder(w).Encode(batchRes); err != nil {

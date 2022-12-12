@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"errors"
 	"fmt"
 	"log"
 	"sync"
@@ -31,14 +32,26 @@ func NewStorage(keysAndLinks util.KeysLinksUserID, fileName string) *Storage {
 	return &Storage{keysLinksUserID: keysAndLinks, fileName: fileName}
 }
 
-func (s *Storage) add(key, link, userID string) {
+func (s *Storage) add(key, link, userID string) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
+
+	_, err := s.GetShortenKey(link)
+
+	if err == nil {
+		return errors.New("found entry")
+	}
+
 	s.keysLinksUserID[key] = util.MapValue{Link: link, UserID: userID}
+	return nil
 }
 
-func (s *Storage) Add(key, link, userID string) string {
-	s.add(key, link, userID)
+func (s *Storage) Add(key, link, userID string) error {
+	err := s.add(key, link, userID)
+
+	if err != nil {
+		return err
+	}
 
 	if s.fileName != "" {
 		p, err := file.NewWriter(s.fileName)
@@ -49,10 +62,20 @@ func (s *Storage) Add(key, link, userID string) string {
 		p.WriteKeyLinkUserID(key, link, userID)
 	}
 
-	return ""
+	return nil
 }
 
-func (s *Storage) GetAllLinksByUserID(userID, baseURL string) []util.AllURLSResponse {
+func (s *Storage) GetShortenKey(originalURL string) (string, error) {
+	for k, v := range s.keysLinksUserID {
+		if v.Link == originalURL {
+			return k, nil
+		}
+	}
+
+	return "", errors.New("not found")
+}
+
+func (s *Storage) GetAllLinksByUserID(userID, baseURL string) ([]util.AllURLSResponse, error) {
 	allUrls := []util.AllURLSResponse{}
 
 	for key, value := range s.keysLinksUserID {
@@ -61,11 +84,16 @@ func (s *Storage) GetAllLinksByUserID(userID, baseURL string) []util.AllURLSResp
 		}
 	}
 
-	return allUrls
+	return allUrls, nil
 }
 
-func (s *Storage) AddInBatch(br []util.BatchResponse, baseURL string) {
+func (s *Storage) AddInBatch(br []util.BatchResponse, baseURL string) (string, error) {
 	for _, v := range br {
-		s.Add(v.ShortURL[len(baseURL)+1:], v.OriginalURL, v.UserID)
+		err := s.Add(v.ShortURL[len(baseURL)+1:], v.OriginalURL, v.UserID)
+		if err != nil {
+			return v.ShortURL, err
+		}
 	}
+
+	return "", nil
 }
