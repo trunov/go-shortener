@@ -1,6 +1,7 @@
 package memory
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"log"
@@ -16,7 +17,7 @@ type Storage struct {
 	fileName        string
 }
 
-func (s *Storage) Get(key string) (string, error) {
+func (s *Storage) Get(_ context.Context, key string) (string, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
 	v, ok := s.keysLinksUserID[key]
@@ -32,11 +33,11 @@ func NewStorage(keysAndLinks util.KeysLinksUserID, fileName string) *Storage {
 	return &Storage{keysLinksUserID: keysAndLinks, fileName: fileName}
 }
 
-func (s *Storage) add(key, link, userID string) error {
+func (s *Storage) add(ctx context.Context, key, link, userID string) error {
 	s.mtx.Lock()
 	defer s.mtx.Unlock()
 
-	_, err := s.GetShortenKey(link)
+	_, err := s.GetShortenKey(ctx, link)
 
 	if err == nil {
 		return errors.New("found entry")
@@ -46,8 +47,8 @@ func (s *Storage) add(key, link, userID string) error {
 	return nil
 }
 
-func (s *Storage) Add(key, link, userID string) error {
-	err := s.add(key, link, userID)
+func (s *Storage) Add(ctx context.Context, key, link, userID string) error {
+	err := s.add(ctx, key, link, userID)
 
 	if err != nil {
 		return err
@@ -65,7 +66,7 @@ func (s *Storage) Add(key, link, userID string) error {
 	return nil
 }
 
-func (s *Storage) GetShortenKey(originalURL string) (string, error) {
+func (s *Storage) GetShortenKey(_ context.Context, originalURL string) (string, error) {
 	for k, v := range s.keysLinksUserID {
 		if v.Link == originalURL {
 			return k, nil
@@ -75,7 +76,7 @@ func (s *Storage) GetShortenKey(originalURL string) (string, error) {
 	return "", errors.New("not found")
 }
 
-func (s *Storage) GetAllLinksByUserID(userID, baseURL string) ([]util.AllURLSResponse, error) {
+func (s *Storage) GetAllLinksByUserID(_ context.Context, userID, baseURL string) ([]util.AllURLSResponse, error) {
 	allUrls := []util.AllURLSResponse{}
 
 	for key, value := range s.keysLinksUserID {
@@ -87,9 +88,9 @@ func (s *Storage) GetAllLinksByUserID(userID, baseURL string) ([]util.AllURLSRes
 	return allUrls, nil
 }
 
-func (s *Storage) AddInBatch(br []util.BatchResponse, baseURL string) (string, error) {
+func (s *Storage) AddInBatch(ctx context.Context, br []util.BatchResponse, baseURL string) (string, error) {
 	for _, v := range br {
-		err := s.Add(v.ShortURL[len(baseURL)+1:], v.OriginalURL, v.UserID)
+		err := s.Add(ctx, v.ShortURL[len(baseURL)+1:], v.OriginalURL, v.UserID)
 		if err != nil {
 			return v.ShortURL, err
 		}

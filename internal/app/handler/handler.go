@@ -19,11 +19,11 @@ import (
 )
 
 type Storager interface {
-	Get(key string) (string, error)
-	Add(key, link, userID string) error
-	GetAllLinksByUserID(userID, baseURL string) ([]util.AllURLSResponse, error)
-	AddInBatch(br []util.BatchResponse, baseURL string) (string, error)
-	GetShortenKey(originalURL string) (string, error)
+	Get(ctx context.Context, key string) (string, error)
+	Add(ctx context.Context, key, link, userID string) error
+	GetAllLinksByUserID(ctx context.Context, userID, baseURL string) ([]util.AllURLSResponse, error)
+	AddInBatch(ctx context.Context, br []util.BatchResponse, baseURL string) (string, error)
+	GetShortenKey(ctx context.Context, originalURL string) (string, error)
 }
 
 type Handler struct {
@@ -61,13 +61,14 @@ func (c *Handler) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 
 	key := util.GenerateRandomString()
 
-	err := c.storage.Add(key, req.URL, userID)
+	ctx := context.Background()
+	err := c.storage.Add(ctx, key, req.URL, userID)
 
 	w.Header().Set("Content-Type", "application/json")
 
 	if err != nil {
 		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
-			k, err := c.storage.GetShortenKey(req.URL)
+			k, err := c.storage.GetShortenKey(ctx, req.URL)
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -114,13 +115,14 @@ func (c *Handler) ShortenLink(w http.ResponseWriter, r *http.Request) {
 
 	key := util.GenerateRandomString()
 
-	err = c.storage.Add(key, string(b), userID)
+	ctx := context.Background()
+	err = c.storage.Add(ctx, key, string(b), userID)
 
 	w.Header().Set("Content-Type", "plain/text")
 
 	if err != nil {
 		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
-			k, err := c.storage.GetShortenKey(string(b))
+			k, err := c.storage.GetShortenKey(ctx, string(b))
 			if err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
@@ -145,7 +147,8 @@ func (c *Handler) ShortenLink(w http.ResponseWriter, r *http.Request) {
 func (c *Handler) GetURLLink(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
 
-	v, err := c.storage.Get(key)
+	ctx := context.Background()
+	v, err := c.storage.Get(ctx, key)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
@@ -159,7 +162,8 @@ func (c *Handler) GetURLLink(w http.ResponseWriter, r *http.Request) {
 func (c *Handler) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
 
-	allURLSByUserID, err := c.storage.GetAllLinksByUserID(userID, c.baseURL)
+	ctx := context.Background()
+	allURLSByUserID, err := c.storage.GetAllLinksByUserID(ctx, userID, c.baseURL)
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -199,7 +203,8 @@ func (c *Handler) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 
-	k, err := c.storage.AddInBatch(batchRes, c.baseURL)
+	ctx := context.Background()
+	k, err := c.storage.AddInBatch(ctx, batchRes, c.baseURL)
 	if err != nil {
 		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
 			finalRes := c.baseURL + "/" + k

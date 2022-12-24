@@ -16,7 +16,6 @@ import (
 )
 
 func Test_ShortenLink(t *testing.T) {
-
 	type want struct {
 		code        int
 		key         string

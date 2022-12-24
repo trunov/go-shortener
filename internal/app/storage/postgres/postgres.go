@@ -19,9 +19,8 @@ func NewDBStorage(conn *pgx.Conn) *dbStorage {
 	return &dbStorage{conn: conn}
 }
 
-func (s *dbStorage) Get(key string) (string, error) {
+func (s *dbStorage) Get(ctx context.Context, key string) (string, error) {
 	var v string
-	ctx := context.Background()
 
 	err := s.conn.QueryRowEx(ctx, "SELECT original_url from shortener WHERE short_url = $1", nil, key).Scan(&v)
 	if err != nil {
@@ -31,9 +30,8 @@ func (s *dbStorage) Get(key string) (string, error) {
 	return v, nil
 }
 
-func (s *dbStorage) GetShortenKey(originalURL string) (string, error) {
+func (s *dbStorage) GetShortenKey(ctx context.Context, originalURL string) (string, error) {
 	var v string
-	ctx := context.Background()
 
 	err := s.conn.QueryRowEx(ctx, "SELECT short_url from shortener WHERE original_url = $1", nil, originalURL).Scan(&v)
 	if err != nil {
@@ -43,9 +41,7 @@ func (s *dbStorage) GetShortenKey(originalURL string) (string, error) {
 	return v, nil
 }
 
-func (s *dbStorage) Add(key, link, userID string) error {
-	ctx := context.Background()
-
+func (s *dbStorage) Add(ctx context.Context, key, link, userID string) error {
 	_, err := s.conn.ExecEx(ctx, "INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", nil, key, link, userID)
 
 	if err != nil {
@@ -55,9 +51,8 @@ func (s *dbStorage) Add(key, link, userID string) error {
 	return nil
 }
 
-func (s *dbStorage) GetAllLinksByUserID(userID, baseURL string) ([]util.AllURLSResponse, error) {
+func (s *dbStorage) GetAllLinksByUserID(ctx context.Context, userID, baseURL string) ([]util.AllURLSResponse, error) {
 	allUrls := []util.AllURLSResponse{}
-	ctx := context.Background()
 
 	rows, err := s.conn.QueryEx(ctx, "SELECT short_url, original_url, user_id from shortener", nil)
 
@@ -87,7 +82,7 @@ func (s *dbStorage) GetAllLinksByUserID(userID, baseURL string) ([]util.AllURLSR
 	return allUrls, nil
 }
 
-func (s *dbStorage) AddInBatch(br []util.BatchResponse, baseURL string) (string, error) {
+func (s *dbStorage) AddInBatch(ctx context.Context, br []util.BatchResponse, baseURL string) (string, error) {
 	tx, err := s.conn.Begin()
 	if err != nil {
 		return "", err
@@ -96,7 +91,6 @@ func (s *dbStorage) AddInBatch(br []util.BatchResponse, baseURL string) (string,
 	defer tx.Rollback()
 
 	for _, v := range br {
-		ctx := context.Background()
 		if _, err := tx.ExecEx(ctx, "INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", nil, v.ShortURL[len(baseURL)+1:], v.OriginalURL, v.UserID); err != nil {
 			return v.ShortURL, err
 		}
