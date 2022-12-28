@@ -102,5 +102,20 @@ func (s *Storage) AddInBatch(ctx context.Context, br []util.BatchResponse, baseU
 }
 
 func (s *Storage) DeleteURLS(_ context.Context, userID string, shortenURLS []string) error {
+	for _, shortenURL := range shortenURLS {
+		s.mtx.Lock()
+		defer s.mtx.Unlock()
+
+		v, ok := s.keysLinksUserID[shortenURL]
+		if !ok {
+			log.Println("value you try to remove is missing")
+			continue
+		}
+
+		if v.UserID == userID {
+			v.IsDeleted = true
+			s.keysLinksUserID[shortenURL] = v
+		}
+	}
 	return nil
 }
