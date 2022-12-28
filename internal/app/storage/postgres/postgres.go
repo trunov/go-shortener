@@ -22,21 +22,21 @@ func NewDBStorage(conn *pgxpool.Pool) *dbStorage {
 	return &dbStorage{dbpool: conn}
 }
 
-func (s *dbStorage) Get(ctx context.Context, key string) (string, error) {
-	var v string
+func (s *dbStorage) Get(ctx context.Context, key string) (util.ShortenerGet, error) {
+	var shortener util.ShortenerGet
 
-	err := s.dbpool.QueryRow(ctx, "SELECT original_url from shortener WHERE short_url = $1", nil, key).Scan(&v)
+	err := s.dbpool.QueryRow(ctx, "SELECT original_url, is_deleted from shortener WHERE short_url = $1", key).Scan(&shortener.OriginalURL, &shortener.IsDeleted)
 	if err != nil {
-		return "", err
+		return shortener, err
 	}
 
-	return v, nil
+	return shortener, nil
 }
 
 func (s *dbStorage) GetShortenKey(ctx context.Context, originalURL string) (string, error) {
 	var v string
 
-	err := s.dbpool.QueryRow(ctx, "SELECT short_url from shortener WHERE original_url = $1", nil, originalURL).Scan(&v)
+	err := s.dbpool.QueryRow(ctx, "SELECT short_url from shortener WHERE original_url = $1", originalURL).Scan(&v)
 	if err != nil {
 		return "", err
 	}
@@ -45,7 +45,7 @@ func (s *dbStorage) GetShortenKey(ctx context.Context, originalURL string) (stri
 }
 
 func (s *dbStorage) Add(ctx context.Context, key, link, userID string) error {
-	_, err := s.dbpool.Exec(ctx, "INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", nil, key, link, userID)
+	_, err := s.dbpool.Exec(ctx, "INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, link, userID)
 
 	if err != nil {
 		return err
@@ -57,7 +57,7 @@ func (s *dbStorage) Add(ctx context.Context, key, link, userID string) error {
 func (s *dbStorage) GetAllLinksByUserID(ctx context.Context, userID, baseURL string) ([]util.AllURLSResponse, error) {
 	allUrls := []util.AllURLSResponse{}
 
-	rows, err := s.dbpool.Query(ctx, "SELECT short_url, original_url, user_id from shortener", nil)
+	rows, err := s.dbpool.Query(ctx, "SELECT short_url, original_url, user_id from shortener")
 
 	if err != nil {
 		return allUrls, err
@@ -94,7 +94,7 @@ func (s *dbStorage) AddInBatch(ctx context.Context, br []util.BatchResponse, bas
 	defer tx.Rollback(ctx)
 
 	for _, v := range br {
-		if _, err := tx.Exec(ctx, "INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", nil, v.ShortURL[len(baseURL)+1:], v.OriginalURL, v.UserID); err != nil {
+		if _, err := tx.Exec(ctx, "INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", v.ShortURL[len(baseURL)+1:], v.OriginalURL, v.UserID); err != nil {
 			return v.ShortURL, err
 		}
 	}

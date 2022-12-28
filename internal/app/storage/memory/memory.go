@@ -17,16 +17,18 @@ type Storage struct {
 	fileName        string
 }
 
-func (s *Storage) Get(_ context.Context, key string) (string, error) {
+func (s *Storage) Get(_ context.Context, key string) (util.ShortenerGet, error) {
 	s.mtx.RLock()
 	defer s.mtx.RUnlock()
+	var shortener util.ShortenerGet
 	v, ok := s.keysLinksUserID[key]
 
 	if !ok {
-		return "", fmt.Errorf("value %s not found", key)
+		return shortener, fmt.Errorf("value %s not found", key)
 	}
 
-	return v.Link, nil
+	shortener = util.ShortenerGet{OriginalURL: v.Link, IsDeleted: v.IsDeleted}
+	return shortener, nil
 }
 
 func NewStorage(keysAndLinks util.KeysLinksUserID, fileName string) *Storage {
@@ -43,7 +45,7 @@ func (s *Storage) add(ctx context.Context, key, link, userID string) error {
 		return errors.New("found entry")
 	}
 
-	s.keysLinksUserID[key] = util.MapValue{Link: link, UserID: userID}
+	s.keysLinksUserID[key] = util.MapValue{Link: link, UserID: userID, IsDeleted: false}
 	return nil
 }
 

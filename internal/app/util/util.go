@@ -16,9 +16,15 @@ type BatchResponse struct {
 	UserID        string `json:"-"`
 }
 
+type ShortenerGet struct {
+	OriginalURL string
+	IsDeleted   bool
+}
+
 type MapValue struct {
-	Link   string
-	UserID string
+	Link      string
+	UserID    string
+	IsDeleted bool
 }
 
 type AllURLSResponse struct {

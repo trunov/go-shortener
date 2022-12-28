@@ -19,7 +19,7 @@ import (
 )
 
 type Storager interface {
-	Get(ctx context.Context, key string) (string, error)
+	Get(ctx context.Context, key string) (util.ShortenerGet, error)
 	Add(ctx context.Context, key, link, userID string) error
 	GetAllLinksByUserID(ctx context.Context, userID, baseURL string) ([]util.AllURLSResponse, error)
 	AddInBatch(ctx context.Context, br []util.BatchResponse, baseURL string) (string, error)
@@ -161,7 +161,12 @@ func (c *Handler) GetURLLink(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	w.Header().Set("Location", v)
+	if v.IsDeleted {
+		w.WriteHeader(http.StatusGone)
+		return
+	}
+
+	w.Header().Set("Location", v.OriginalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
 }
 
