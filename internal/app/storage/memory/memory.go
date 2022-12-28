@@ -98,3 +98,7 @@ func (s *Storage) AddInBatch(ctx context.Context, br []util.BatchResponse, baseU
 
 	return "", nil
 }
+
+func (s *Storage) DeleteURLS(_ context.Context, userID string, shortenURLS []string) error {
+	return nil
+}

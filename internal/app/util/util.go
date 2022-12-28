@@ -71,3 +71,24 @@ func FindAllURLSByUserID(urlsMap map[string]MapValue, userID, baseURL string) []
 
 	return allUrls
 }
+
+func GenerateChannel(shortenURLS []string) chan []string {
+	ch := make(chan []string)
+	const chunkSize = 2
+
+	go func() {
+		defer close(ch)
+
+		for i := 0; i < len(shortenURLS); i += chunkSize {
+			end := i + chunkSize
+
+			if end > len(shortenURLS) {
+				end = len(shortenURLS)
+			}
+
+			ch <- shortenURLS[i:end]
+		}
+	}()
+
+	return ch
+}

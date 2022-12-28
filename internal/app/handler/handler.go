@@ -24,12 +24,18 @@ type Storager interface {
 	GetAllLinksByUserID(ctx context.Context, userID, baseURL string) ([]util.AllURLSResponse, error)
 	AddInBatch(ctx context.Context, br []util.BatchResponse, baseURL string) (string, error)
 	GetShortenKey(ctx context.Context, originalURL string) (string, error)
+	DeleteURLS(ctx context.Context, userID string, shortenURLS []string) error
+}
+
+type Worker interface {
+	Start(ctx context.Context, inputCh chan []string, userID string)
 }
 
 type Handler struct {
-	storage Storager
-	pinger  postgres.Pinger
-	baseURL string
+	storage    Storager
+	pinger     postgres.Pinger
+	baseURL    string
+	workerpool Worker
 }
 
 type BatchRequest struct {
@@ -45,8 +51,8 @@ type Response struct {
 	Result string `json:"result"`
 }
 
-func NewHandler(storage Storager, pinger postgres.Pinger, baseURL string) *Handler {
-	return &Handler{storage: storage, pinger: pinger, baseURL: baseURL}
+func NewHandler(storage Storager, pinger postgres.Pinger, baseURL string, workerpool Worker) *Handler {
+	return &Handler{storage: storage, pinger: pinger, baseURL: baseURL, workerpool: workerpool}
 }
 
 func (c *Handler) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
@@ -231,6 +237,24 @@ func (c *Handler) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func (c *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
+	ctx := context.Background()
+	userID := r.Context().Value("user_id").(string)
+
+	var arr []string
+
+	if err := json.NewDecoder(r.Body).Decode(&arr); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	inputCh := util.GenerateChannel(arr)
+	go c.workerpool.Start(ctx, inputCh, userID)
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusAccepted)
+}
+
 func (c *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	if c.pinger == nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -263,7 +287,10 @@ func NewRouter(c *Handler) chi.Router {
 	r.Get("/ping", c.PingDBHandler)
 
 	r.Route("/api", func(r chi.Router) {
-		r.Get("/user/urls", c.GetUrlsByUserID)
+		r.Route("/user/urls", func(r chi.Router) {
+			r.Get("/", c.GetUrlsByUserID)
+			r.Delete("/", c.DeleteHandler)
+		})
 
 		r.Route("/shorten", func(r chi.Router) {
 			r.Post("/", c.ShortenJSONLink)
