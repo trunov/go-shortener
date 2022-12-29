@@ -3,13 +3,15 @@ package file
 import (
 	"bufio"
 	"encoding/json"
-	"log"
 	"os"
+
+	"github.com/trunov/go-shortener/internal/app/util"
 )
 
-type KeyAndLink struct {
-	Key  string `json:"key"`
-	Link string `json:"link"`
+type KeyLinkUserID struct {
+	Key    string `json:"key"`
+	Link   string `json:"link"`
+	UserID string `json:"userID"`
 }
 
 type reader struct {
@@ -32,34 +34,34 @@ func (c *reader) Close() error {
 	return c.file.Close()
 }
 
-func (c *reader) ReadLinksAndKeys(keysAndLinks map[string]string) error {
+func (c *reader) ReadLinksAndKeys(keysAndLinks map[string]util.MapValue) error {
 	c.scanner.Split(bufio.ScanLines)
 
 	for c.scanner.Scan() {
-		keyAndLink := KeyAndLink{}
+		keyAndLink := KeyLinkUserID{}
 
 		err := json.Unmarshal(c.scanner.Bytes(), &keyAndLink)
 		if err != nil {
 			return err
 		}
 
-		keysAndLinks[keyAndLink.Key] = keyAndLink.Link
+		keysAndLinks[keyAndLink.Key] = util.MapValue{Link: keyAndLink.Link, UserID: keyAndLink.UserID}
 	}
 
 	return nil
 }
 
-func SeedMapWithKeysAndLinks(fileStoragePath string, keysAndLinks map[string]string) *reader {
+func SeedMapWithKeysAndLinks(fileStoragePath string, keysAndLinks map[string]util.MapValue) (*reader, error) {
 	reader, err := NewReader(fileStoragePath)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	if readerErr := reader.ReadLinksAndKeys(keysAndLinks); readerErr != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
-	return reader
+	return reader, nil
 }
 
 type Writer struct {
@@ -82,7 +84,7 @@ func (p *Writer) Close() error {
 	return p.file.Close()
 }
 
-func (p *Writer) WriteKeyAndLink(key string, link string) error {
-	keyAndLink := KeyAndLink{Key: key, Link: link}
-	return p.encoder.Encode(keyAndLink)
+func (p *Writer) WriteKeyLinkUserID(key, link, userID string) error {
+	keyLinkUserID := KeyLinkUserID{Key: key, Link: link, UserID: userID}
+	return p.encoder.Encode(keyLinkUserID)
 }

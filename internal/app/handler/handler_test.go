@@ -7,7 +7,9 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/trunov/go-shortener/internal/app/storage"
+	"github.com/trunov/go-shortener/internal/app/storage/memory"
+	"github.com/trunov/go-shortener/internal/app/storage/postgres"
+	"github.com/trunov/go-shortener/internal/app/util"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -21,10 +23,9 @@ func Test_ShortenLink(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		want         want
-		linksAndKeys map[string]string
-		website      string
+		name    string
+		want    want
+		website string
 	}{
 		{
 			name: "should return 201 and generated key",
@@ -33,17 +34,17 @@ func Test_ShortenLink(t *testing.T) {
 				key:         "12345678",
 				contentType: "plain/text",
 			},
-			linksAndKeys: make(map[string]string),
-			website:      "https://go.dev/src/net/http/request_test.go",
+			website: "https://go.dev/src/net/http/request_test.go",
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			keysAndLinks := make(map[string]string)
-			s := storage.NewStorage(keysAndLinks, "")
+			keysLinksUserID := make(map[string]util.MapValue)
+			s := memory.NewStorage(keysLinksUserID, "")
+			var p postgres.Pinger
 			baseURL := "http://localhost:8080"
 
-			c := NewContainer(s, baseURL)
+			c := NewHandler(s, p, baseURL)
 			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.website))
 
 			w := httptest.NewRecorder()
@@ -70,10 +71,10 @@ func Test_GetLink(t *testing.T) {
 	}
 
 	tests := []struct {
-		name         string
-		want         want
-		keysAndLinks map[string]string
-		key          string
+		name            string
+		want            want
+		keysLinksUserID map[string]util.MapValue
+		key             string
 	}{
 		{
 			name: "should return url in header location and status of temporary redirection",
@@ -81,8 +82,8 @@ func Test_GetLink(t *testing.T) {
 				statusCode: http.StatusTemporaryRedirect,
 				url:        "https://go.dev/src/net/http/request_test.go",
 			},
-			keysAndLinks: map[string]string{"12345678": "https://go.dev/src/net/http/request_test.go"},
-			key:          "12345678",
+			keysLinksUserID: map[string]util.MapValue{"12345678": {Link: "https://go.dev/src/net/http/request_test.go", UserID: "user1"}},
+			key:             "12345678",
 		},
 		{
 			name: "should return 404 Not Found",
@@ -90,17 +91,19 @@ func Test_GetLink(t *testing.T) {
 				statusCode: http.StatusNotFound,
 				url:        "",
 			},
-			keysAndLinks: map[string]string{"123asd1": "https://go.dev/src/net/http/request_test.go"},
-			key:          "21323",
+			keysLinksUserID: map[string]util.MapValue{"123asd1": {Link: "https://go.dev/src/net/http/request_test.go", UserID: "user1"}},
+			key:             "21323",
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			s := storage.NewStorage(tt.keysAndLinks, "")
-			var baseURL string
+			s := memory.NewStorage(tt.keysLinksUserID, "")
 
-			c := NewContainer(s, baseURL)
+			var baseURL string
+			var p postgres.Pinger
+
+			c := NewHandler(s, p, baseURL)
 
 			r := NewRouter(c)
 
