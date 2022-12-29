@@ -1,12 +1,13 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
 
-	"github.com/jackc/pgx"
+	"github.com/jackc/pgx/v4/pgxpool"
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
 	"github.com/trunov/go-shortener/internal/app/handler"
@@ -18,6 +19,7 @@ import (
 
 func StartServer(cfg config.Config) {
 	keysAndLinks := make(map[string]util.MapValue)
+	ctx := context.Background()
 
 	if cfg.FileStoragePath != "" {
 		reader, err := file.SeedMapWithKeysAndLinks(cfg.FileStoragePath, keysAndLinks)
@@ -30,21 +32,17 @@ func StartServer(cfg config.Config) {
 	var storage handler.Storager
 	var pinger postgres.Pinger
 
-	var conn *pgx.Conn
+	var dbpool *pgxpool.Pool
 	if cfg.DatabaseDSN != "" {
-		dbConfig, err := pgx.ParseConnectionString(cfg.DatabaseDSN)
-		if err != nil {
-			log.Println(err)
-		}
-
-		conn, err = pgx.Connect(dbConfig)
+		var err error
+		dbpool, err = pgxpool.Connect(ctx, cfg.DatabaseDSN)
 		if err != nil {
 			fmt.Printf("Unable to connect to database: %v\n", err)
 			os.Exit(1)
 		}
-		defer conn.Close()
+		defer dbpool.Close()
 
-		dbStorage := postgres.NewDBStorage(conn)
+		dbStorage := postgres.NewDBStorage(dbpool)
 		storage = dbStorage
 		pinger = dbStorage
 
@@ -55,8 +53,9 @@ func StartServer(cfg config.Config) {
 	} else {
 		storage = memory.NewStorage(keysAndLinks, cfg.FileStoragePath)
 	}
+	workerpool := NewWorkerpool(&storage)
 
-	c := handler.NewHandler(storage, pinger, cfg.BaseURL)
+	c := handler.NewHandler(storage, pinger, cfg.BaseURL, workerpool)
 	r := handler.NewRouter(c)
 
 	log.Println("server is starting on port ", cfg.ServerAddress)
