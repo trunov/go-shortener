@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"strings"
 
 	"github.com/jackc/pgerrcode"
@@ -16,6 +17,7 @@ import (
 	"github.com/trunov/go-shortener/internal/app/util"
 
 	"github.com/go-chi/chi/v5"
+	chiMiddleware "github.com/go-chi/chi/v5/middleware"
 )
 
 type Storager interface {
@@ -286,6 +288,7 @@ func NewRouter(c *Handler) chi.Router {
 	r.Use(middleware.GzipHandle)
 	r.Use(middleware.DecompressHandle)
 	r.Use(middleware.CookieMiddleware(key))
+	r.Mount("/debug", chiMiddleware.Profiler())
 
 	r.Post("/", c.ShortenLink)
 	r.Get("/{key}", c.GetURLLink)
