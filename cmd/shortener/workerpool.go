@@ -6,8 +6,9 @@ import (
 	"log"
 	"runtime"
 
-	"github.com/trunov/go-shortener/internal/app/handler"
 	"golang.org/x/sync/errgroup"
+
+	"github.com/trunov/go-shortener/internal/app/handler"
 )
 
 type Workerpool struct {

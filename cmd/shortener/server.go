@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
 	"github.com/trunov/go-shortener/internal/app/handler"
