@@ -1,3 +1,4 @@
+// Package postgres provides a PostgreSQL-backed storage implementation for the URL shortener.
 package postgres
 
 import (
@@ -11,18 +12,22 @@ import (
 	"github.com/trunov/go-shortener/internal/app/util"
 )
 
+// Pinger represents an interface that can verify if a connection is alive.
 type Pinger interface {
 	Ping(context.Context) error
 }
 
+// dbStorage is a database storage implementation using a PostgreSQL connection pool.
 type dbStorage struct {
 	dbpool *pgxpool.Pool
 }
 
+// NewDBStorage creates a new instance of dbStorage with a given connection pool.
 func NewDBStorage(conn *pgxpool.Pool) *dbStorage {
 	return &dbStorage{dbpool: conn}
 }
 
+// Get retrieves the original URL and its deletion status associated with a given key from the database.
 func (s *dbStorage) Get(ctx context.Context, key string) (util.ShortenerGet, error) {
 	var shortener util.ShortenerGet
 
@@ -34,6 +39,7 @@ func (s *dbStorage) Get(ctx context.Context, key string) (util.ShortenerGet, err
 	return shortener, nil
 }
 
+// GetShortenKey finds and returns the key for a given original URL in the database.
 func (s *dbStorage) GetShortenKey(ctx context.Context, originalURL string) (string, error) {
 	var v string
 
@@ -45,6 +51,7 @@ func (s *dbStorage) GetShortenKey(ctx context.Context, originalURL string) (stri
 	return v, nil
 }
 
+// Add inserts a new shortened URL entry into the database.
 func (s *dbStorage) Add(ctx context.Context, key, link, userID string) error {
 	_, err := s.dbpool.Exec(ctx, "INSERT INTO shortener (short_url, original_url, user_id) values ($1, $2,$3)", key, link, userID)
 
@@ -55,6 +62,7 @@ func (s *dbStorage) Add(ctx context.Context, key, link, userID string) error {
 	return nil
 }
 
+// GetAllLinksByUserID fetches all the short URLs associated with a user ID from the database and returns them.
 func (s *dbStorage) GetAllLinksByUserID(ctx context.Context, userID, baseURL string) ([]util.AllURLSResponse, error) {
 	allUrls := []util.AllURLSResponse{}
 
@@ -86,6 +94,7 @@ func (s *dbStorage) GetAllLinksByUserID(ctx context.Context, userID, baseURL str
 	return allUrls, nil
 }
 
+// AddInBatch adds multiple shortened URLs at once to the database using a transaction.
 func (s *dbStorage) AddInBatch(ctx context.Context, br []util.BatchResponse, baseURL string) (string, error) {
 	tx, err := s.dbpool.Begin(ctx)
 	if err != nil {
@@ -108,6 +117,7 @@ func (s *dbStorage) AddInBatch(ctx context.Context, br []util.BatchResponse, bas
 	return "", nil
 }
 
+// DeleteURLS marks specified URLs as deleted for a given user ID in the database.
 func (s *dbStorage) DeleteURLS(ctx context.Context, userID string, shortenURLS []string) error {
 	tx, err := s.dbpool.Begin(ctx)
 	if err != nil {
@@ -145,6 +155,7 @@ func (s *dbStorage) DeleteURLS(ctx context.Context, userID string, shortenURLS [
 	return nil
 }
 
+// Ping checks the database connection status.
 func (s *dbStorage) Ping(ctx context.Context) error {
 	err := s.dbpool.Ping(ctx)
 
