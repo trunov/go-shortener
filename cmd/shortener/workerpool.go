@@ -3,7 +3,6 @@ package main
 import (
 	"context"
 	"fmt"
-	"log"
 	"runtime"
 
 	"golang.org/x/sync/errgroup"
@@ -11,12 +10,13 @@ import (
 	"github.com/trunov/go-shortener/internal/app/handler"
 )
 
-type Workerpool struct {
-	storage handler.Storager
-}
-
 type Job interface {
 	Run(ctx context.Context) error
+}
+
+type Workerpool struct {
+	storage handler.Storager
+	jobs    chan Job
 }
 
 type DeleteURLSJob struct {
@@ -26,6 +26,13 @@ type DeleteURLSJob struct {
 }
 
 func NewWorkerpool(storage *handler.Storager) *Workerpool {
+	wp := &Workerpool{
+		storage: *storage,
+		jobs:    make(chan Job),
+	}
+
+	go wp.runPool(context.Background())
+
 	return &Workerpool{storage: *storage}
 }
 
@@ -38,17 +45,20 @@ func (j *DeleteURLSJob) Run(ctx context.Context) error {
 	return nil
 }
 
-func (w *Workerpool) runPool(ctx context.Context, jobs chan Job) error {
+func (w *Workerpool) runPool(ctx context.Context) error {
 	gr, ctx := errgroup.WithContext(ctx)
 	for i := 0; i < runtime.GOMAXPROCS(runtime.NumCPU()-1); i++ {
 		gr.Go(func() error {
 			for {
 				select {
-				case job := <-jobs:
-					err := job.Run(ctx)
-					if err != nil {
+				case job, ok := <-w.jobs:
+					if !ok {
+						return nil
+					}
+					if err := job.Run(ctx); err != nil {
 						return err
 					}
+
 				case <-ctx.Done():
 					return ctx.Err()
 				}
@@ -59,30 +69,40 @@ func (w *Workerpool) runPool(ctx context.Context, jobs chan Job) error {
 }
 
 func (w *Workerpool) Start(ctx context.Context, inputCh chan []string, userID string) {
-	jobs := make(chan Job)
-
-	go func() {
-		for inputCh != nil {
-			v, ok := <-inputCh
-			if !ok {
-				inputCh = nil
-				continue
-			}
-			jobs <- &DeleteURLSJob{
-				storage:     w.storage,
-				shortenURLS: v,
-				userID:      userID,
-			}
-
+	for shortenURLs := range inputCh {
+		w.jobs <- &DeleteURLSJob{
+			storage:     w.storage,
+			shortenURLS: shortenURLs,
+			userID:      userID,
 		}
-	}()
-
-	defer func() {
-		close(jobs)
-	}()
-
-	err := w.runPool(ctx, jobs)
-	if err != nil {
-		log.Println(err)
 	}
 }
+
+// func (w *Workerpool) Start(ctx context.Context, inputCh chan []string, userID string) {
+// 	jobs := make(chan Job)
+
+// 	go func() {
+// 		for inputCh != nil {
+// 			v, ok := <-inputCh
+// 			if !ok {
+// 				inputCh = nil
+// 				continue
+// 			}
+// 			jobs <- &DeleteURLSJob{
+// 				storage:     w.storage,
+// 				shortenURLS: v,
+// 				userID:      userID,
+// 			}
+
+// 		}
+// 	}()
+
+// 	defer func() {
+// 		close(jobs)
+// 	}()
+
+// 	err := w.runPool(ctx, jobs)
+// 	if err != nil {
+// 		log.Println(err)
+// 	}
+// }

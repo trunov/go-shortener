@@ -11,8 +11,6 @@ import (
 	"github.com/trunov/go-shortener/internal/app/util"
 )
 
-// Add benchmarks
-
 func BenchmarkShortenLink(b *testing.B) {
 	keysLinksUserID := make(map[string]util.MapValue)
 	s := memory.NewStorage(keysLinksUserID, "")
