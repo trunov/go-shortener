@@ -33,7 +33,7 @@ func NewWorkerpool(storage *handler.Storager) *Workerpool {
 
 	go wp.runPool(context.Background())
 
-	return &Workerpool{storage: *storage}
+	return wp
 }
 
 func (j *DeleteURLSJob) Run(ctx context.Context) error {
