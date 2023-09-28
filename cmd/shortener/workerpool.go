@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"runtime"
 
 	"golang.org/x/sync/errgroup"
@@ -28,7 +29,7 @@ type DeleteURLSJob struct {
 func NewWorkerpool(storage *handler.Storager) *Workerpool {
 	wp := &Workerpool{
 		storage: *storage,
-		jobs:    make(chan Job),
+		jobs:    make(chan Job, 10),
 	}
 
 	go wp.runPool(context.Background())
@@ -56,7 +57,7 @@ func (w *Workerpool) runPool(ctx context.Context) error {
 						return nil
 					}
 					if err := job.Run(ctx); err != nil {
-						return err
+						log.Println(err)
 					}
 
 				case <-ctx.Done():
