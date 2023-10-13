@@ -19,7 +19,10 @@ func ExampleHandler_GetURLLink() {
 	var p postgres.Pinger
 
 	h := NewHandler(s, p, baseURL, nil)
-	r := NewRouter(h)
+	r, err := NewRouter(h)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	// Make a request to the shortened URL
 	req, err := http.NewRequest(http.MethodGet, "/123asd1", nil)

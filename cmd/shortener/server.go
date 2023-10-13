@@ -6,6 +6,9 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
+	"syscall"
+	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
 
@@ -18,14 +21,16 @@ import (
 	"github.com/trunov/go-shortener/migrate"
 )
 
-func StartServer(cfg config.Config) {
+// make a function GracefulShutdown
+
+func StartServer(cfg config.Config) error {
 	keysAndLinks := make(map[string]util.MapValue)
 	ctx := context.Background()
 
 	if cfg.FileStoragePath != "" {
 		reader, err := file.SeedMapWithKeysAndLinks(cfg.FileStoragePath, keysAndLinks)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 		defer reader.Close()
 	}
@@ -39,7 +44,7 @@ func StartServer(cfg config.Config) {
 		dbpool, err = pgxpool.Connect(ctx, cfg.DatabaseDSN)
 		if err != nil {
 			fmt.Printf("Unable to connect to database: %v\n", err)
-			os.Exit(1)
+			return err
 		}
 		defer dbpool.Close()
 
@@ -49,7 +54,7 @@ func StartServer(cfg config.Config) {
 
 		err = migrate.Migrate(cfg.DatabaseDSN, migrate.Migrations)
 		if err != nil {
-			log.Fatal(err)
+			return err
 		}
 	} else {
 		storage = memory.NewStorage(keysAndLinks, cfg.FileStoragePath)
@@ -57,8 +62,43 @@ func StartServer(cfg config.Config) {
 	workerpool := NewWorkerpool(&storage)
 
 	c := handler.NewHandler(storage, pinger, cfg.BaseURL, workerpool)
-	r := handler.NewRouter(c)
+	r, err := handler.NewRouter(c)
+	if err != nil {
+		fmt.Printf("Failed to create router: %v\n", err)
+		return err
+	}
+
+	server := &http.Server{
+		Addr:    cfg.ServerAddress,
+		Handler: r,
+	}
+
+	done := make(chan os.Signal, 1)
+	signal.Notify(done, os.Interrupt, syscall.SIGTERM)
+
+	go func() error {
+		if err := server.ListenAndServe(); err != nil {
+			return err
+		}
+		return nil
+	}()
 
 	log.Println("server is starting on port ", cfg.ServerAddress)
-	http.ListenAndServe(cfg.ServerAddress, r)
+
+	<-done
+	log.Print("Server Stopped")
+
+	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	if err := server.Shutdown(ctxShutdown); err != nil {
+		return err
+	}
+	log.Print("Server Exited Properly")
+
+	if dbpool != nil {
+		dbpool.Close()
+	}
+
+	return nil
 }

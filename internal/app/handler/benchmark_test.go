@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -34,7 +35,10 @@ func BenchmarkGetLink(b *testing.B) {
 	var p postgres.Pinger
 
 	c := NewHandler(s, p, baseURL, nil)
-	r := NewRouter(c)
+	r, err := NewRouter(c)
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	for i := 0; i < b.N; i++ {
 		req, _ := http.NewRequest(http.MethodGet, "/12345678", nil)

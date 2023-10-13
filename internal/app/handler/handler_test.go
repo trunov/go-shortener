@@ -2,6 +2,7 @@ package handler
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -105,7 +106,10 @@ func Test_GetLink(t *testing.T) {
 
 			c := NewHandler(s, p, baseURL, nil)
 
-			r := NewRouter(c)
+			r, err := NewRouter(c)
+			if err != nil {
+				log.Fatal(err)
+			}
 
 			req, err := http.NewRequest(http.MethodGet, "/"+tt.key, nil)
 			require.NoError(t, err)

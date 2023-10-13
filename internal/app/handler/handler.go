@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"log"
 	"net/http"
 	_ "net/http/pprof"
 	"strings"
@@ -296,12 +295,12 @@ func (c *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // NewRouter sets up and returns a new router with all the URL shortening routes configured.
-func NewRouter(c *Handler) chi.Router {
+func NewRouter(c *Handler) (chi.Router, error) {
 	r := chi.NewRouter()
 
 	key, err := util.GenerateRandom(2 * aes.BlockSize)
 	if err != nil {
-		log.Fatal(err)
+		return nil, err
 	}
 
 	r.Use(middleware.GzipHandle)
@@ -325,5 +324,5 @@ func NewRouter(c *Handler) chi.Router {
 		})
 	})
 
-	return r
+	return r, nil
 }
