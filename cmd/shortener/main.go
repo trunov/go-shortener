@@ -5,16 +5,12 @@ import (
 	"fmt"
 
 	"github.com/trunov/go-shortener/internal/app/config"
-	"github.com/trunov/go-shortener/internal/app/util"
 )
 
-//go:generate sh -c "printf %s $(git rev-parse HEAD) > commit.txt"
-//go:embed commit.txt
-var BuildCommit string
-
 var (
-	Version   string
-	BuildDate string
+	buildVersion = "N/A"
+	buildDate    = "N/A"
+	buildCommit  = "N/A"
 )
 
 func main() {
@@ -24,13 +20,9 @@ func main() {
 		return
 	}
 
-	Version = util.DefaultIfEmpty(Version, "N/A")
-	BuildDate = util.DefaultIfEmpty(BuildDate, "N/A")
-	BuildCommit = util.DefaultIfEmpty(BuildCommit, "N/A")
-
-	fmt.Printf("Build version: %s\n", Version)
-	fmt.Printf("Build date: %s\n", BuildDate)
-	fmt.Printf("Build commit: %s\n", BuildCommit)
+	fmt.Printf("Build version: %s\n", buildVersion)
+	fmt.Printf("Build date: %s\n", buildDate)
+	fmt.Printf("Build commit: %s\n", buildCommit)
 
 	if err := StartServer(cfg); err != nil {
 		fmt.Printf("Failed to start server: %v\n", err)

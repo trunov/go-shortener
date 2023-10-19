@@ -112,12 +112,3 @@ func GenerateChannel(shortenURLS []string) chan []string {
 
 	return ch
 }
-
-// DefaultIfEmpty preliminary check before stdout output for main function
-func DefaultIfEmpty(value, defaultValue string) string {
-	if value == "" {
-		return defaultValue
-	}
-
-	return value
-}

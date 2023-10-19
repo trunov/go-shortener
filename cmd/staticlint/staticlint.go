@@ -22,13 +22,13 @@ import (
 var OsExitAnalyzer = &analysis.Analyzer{
 	Name: "osExit",
 	Doc:  "Prohibits the use of a direct call to os.Exit in the main function",
-	Run:  runOsExit,
+	Run:  checkOsExit,
 }
 
-// runOsExit is the function that implements the logic for the OsExitAnalyzer.
+// checkOsExit is the function that implements the logic for the OsExitAnalyzer.
 // It traverses the AST of the provided files and reports any direct calls to os.Exit
 // within the main function of the main package.
-func runOsExit(pass *analysis.Pass) (interface{}, error) {
+func checkOsExit(pass *analysis.Pass) (interface{}, error) {
 	// If it's not the main package, just return
 	if pass.Pkg.Name() != "main" {
 		return nil, nil
