@@ -1,3 +1,28 @@
+// staticlint is a tool that provides various code analysis checks for Go code.
+//
+// Launch Mechanism:
+//
+// staticlint uses the multichecker package from the go/analysis library
+// to run multiple analyzers on the provided Go code.
+// The specific analyzers to be executed by staticlint are determined
+// by a configuration file named 'config.json'. This file must be
+// located in the same directory as the staticlint executable.
+//
+// The configuration file specifies which staticcheck analyzers to run,
+// and staticlint runs these in addition to its built-in analyzers.
+//
+// Built-in Analyzers:
+//
+// - OsExitAnalyzer: Prohibits the use of a direct call to os.Exit in the main function.
+// - printf.Analyzer: Checks for incorrect usage of formatting functions.
+// - shadow.Analyzer: Checks for variable shadowing.
+// - structtag.Analyzer: Checks for ill-formed struct field tags.
+// - shift.Analyzer: Checks for suspicious bit shifts.
+// - errcheck.Analyzer: Checks for unchecked errors.
+//
+// In addition to the built-in analyzers, staticlint can also run
+// any of the analyzers from the staticcheck tool, as specified in
+// the configuration file.
 package main
 
 import (

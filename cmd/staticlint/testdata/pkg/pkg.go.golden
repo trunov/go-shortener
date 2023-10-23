@@ -1,0 +1,1 @@
+analysistest.go:498: /Users/trunov/Desktop/main/projects/go-shortener/cmd/staticlint/testdata/pkg/pkg.go:6:2: unexpected diagnostic: direct call to os.Exit found in main function
