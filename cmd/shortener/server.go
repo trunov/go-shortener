@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
@@ -24,6 +25,7 @@ import (
 // make a function GracefulShutdown
 
 func StartServer(cfg config.Config) error {
+	var server *http.Server
 	keysAndLinks := make(map[string]util.MapValue)
 	ctx := context.Background()
 
@@ -68,9 +70,24 @@ func StartServer(cfg config.Config) error {
 		return err
 	}
 
-	server := &http.Server{
-		Addr:    cfg.ServerAddress,
-		Handler: r,
+	if cfg.EnableHTTPS {
+		manager := &autocert.Manager{
+			Cache:      autocert.DirCache("cache-dir"),
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist("myshortener.ru", "www.myshortener.ru"),
+		}
+
+		server = &http.Server{
+			Addr:      cfg.ServerAddress,
+			Handler:   r,
+			TLSConfig: manager.TLSConfig(),
+		}
+
+	} else {
+		server = &http.Server{
+			Addr:    cfg.ServerAddress,
+			Handler: r,
+		}
 	}
 
 	done := make(chan os.Signal, 1)
