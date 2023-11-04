@@ -1,3 +1,4 @@
+// Package config allows you to read config from local calls or flags from the terminal.
 package config
 
 import (
@@ -6,6 +7,7 @@ import (
 	"github.com/caarlos0/env/v6"
 )
 
+// Config represents the configuration with BaseURL, ServerAddress, FileStoragePath, and DatabaseDSN.
 type Config struct {
 	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080"`
 	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
@@ -13,6 +15,7 @@ type Config struct {
 	DatabaseDSN     string `env:"DATABASE_DSN"`
 }
 
+// ReadConfig reads the configuration from environment variables and flags.
 func ReadConfig() (Config, error) {
 	cfgEnv := Config{}
 

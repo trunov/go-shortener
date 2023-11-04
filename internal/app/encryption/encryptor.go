@@ -1,3 +1,4 @@
+// Package encryption helps to encode and decode userID.
 package encryption
 
 import (
@@ -9,16 +10,19 @@ import (
 	"github.com/trunov/go-shortener/internal/app/util"
 )
 
+// Encryptor represents an encryptor with a key for encoding and decoding.
 type Encryptor struct {
 	key []byte
 }
 
+// NewEncryptor - constructor for the Encryptor type.
 func NewEncryptor(key []byte) *Encryptor {
 	return &Encryptor{
 		key: key,
 	}
 }
 
+// Encode encodes the given userID.
 func (e *Encryptor) Encode(userID []byte) (string, error) {
 	c, err := aes.NewCipher(e.key)
 	if err != nil {
@@ -41,6 +45,7 @@ func (e *Encryptor) Encode(userID []byte) (string, error) {
 	return base64.StdEncoding.EncodeToString([]byte(out)), nil
 }
 
+// Decode decodes the given userID.
 func (e *Encryptor) Decode(userID string) (string, error) {
 	b64Decode, err := base64.StdEncoding.DecodeString(userID)
 	if err != nil {

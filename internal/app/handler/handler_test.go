@@ -2,6 +2,7 @@ package handler
 
 import (
 	"io"
+	"log"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -44,7 +45,7 @@ func Test_ShortenLink(t *testing.T) {
 			var p postgres.Pinger
 			baseURL := "http://localhost:8080"
 
-			c := NewHandler(s, p, baseURL)
+			c := NewHandler(s, p, baseURL, nil)
 			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.website))
 
 			w := httptest.NewRecorder()
@@ -103,9 +104,12 @@ func Test_GetLink(t *testing.T) {
 			var baseURL string
 			var p postgres.Pinger
 
-			c := NewHandler(s, p, baseURL)
+			c := NewHandler(s, p, baseURL, nil)
 
-			r := NewRouter(c)
+			r, err := NewRouter(c)
+			if err != nil {
+				log.Fatal(err)
+			}
 
 			req, err := http.NewRequest(http.MethodGet, "/"+tt.key, nil)
 			require.NoError(t, err)
