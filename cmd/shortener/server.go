@@ -103,7 +103,7 @@ func StartServer(cfg config.Config) error {
 	log.Println("server is starting on port ", cfg.ServerAddress)
 
 	<-done
-	log.Print("Server Stopped")
+	workerpool.Stop()
 
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
@@ -116,6 +116,8 @@ func StartServer(cfg config.Config) error {
 	if dbpool != nil {
 		dbpool.Close()
 	}
+
+	log.Print("Server Gracefully Stopped")
 
 	return nil
 }

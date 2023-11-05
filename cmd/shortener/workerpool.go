@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"runtime"
+	"sync"
 
 	"golang.org/x/sync/errgroup"
 
@@ -18,6 +19,7 @@ type Job interface {
 type Workerpool struct {
 	storage handler.Storager
 	jobs    chan Job
+	wg      sync.WaitGroup
 }
 
 type DeleteURLSJob struct {
@@ -48,8 +50,11 @@ func (j *DeleteURLSJob) Run(ctx context.Context) error {
 
 func (w *Workerpool) runPool(ctx context.Context) error {
 	gr, ctx := errgroup.WithContext(ctx)
+
 	for i := 0; i < runtime.GOMAXPROCS(runtime.NumCPU()-1); i++ {
+		w.wg.Add(1)
 		gr.Go(func() error {
+			defer w.wg.Done()
 			for {
 				select {
 				case job, ok := <-w.jobs:
@@ -79,31 +84,7 @@ func (w *Workerpool) Start(ctx context.Context, inputCh chan []string, userID st
 	}
 }
 
-// func (w *Workerpool) Start(ctx context.Context, inputCh chan []string, userID string) {
-// 	jobs := make(chan Job)
-
-// 	go func() {
-// 		for inputCh != nil {
-// 			v, ok := <-inputCh
-// 			if !ok {
-// 				inputCh = nil
-// 				continue
-// 			}
-// 			jobs <- &DeleteURLSJob{
-// 				storage:     w.storage,
-// 				shortenURLS: v,
-// 				userID:      userID,
-// 			}
-
-// 		}
-// 	}()
-
-// 	defer func() {
-// 		close(jobs)
-// 	}()
-
-// 	err := w.runPool(ctx, jobs)
-// 	if err != nil {
-// 		log.Println(err)
-// 	}
-// }
+func (w *Workerpool) Stop() {
+	close(w.jobs)
+	w.wg.Wait()
+}
