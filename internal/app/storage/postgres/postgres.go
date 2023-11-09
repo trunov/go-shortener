@@ -164,3 +164,25 @@ func (s *dbStorage) Ping(ctx context.Context) error {
 	}
 	return nil
 }
+
+// GetInternalStats return Internal stats of shortener service such as Urls and Users.
+func (s *dbStorage) GetInternalStats(ctx context.Context) (util.InternalStats, error) {
+	stats := util.InternalStats{}
+
+	query := `
+		SELECT 
+		  COUNT(DISTINCT user_id) AS total_users, 
+		  COUNT(*) AS total_short_urls 
+		FROM 
+		  shortener
+		WHERE 
+		  is_deleted = false;
+	`
+
+	err := s.dbpool.QueryRow(ctx, query).Scan(&stats.Users, &stats.Urls)
+	if err != nil {
+		return stats, err
+	}
+
+	return stats, nil
+}

@@ -16,9 +16,10 @@ func ExampleHandler_GetURLLink() {
 	keysLinksUserID := map[string]util.MapValue{"123asd1": {Link: "https://www.example.com", UserID: "user1"}}
 	s := memory.NewStorage(keysLinksUserID, "")
 	baseURL := ""
+	trustedSubent := ""
 	var p postgres.Pinger
 
-	h := NewHandler(s, p, baseURL, nil)
+	h := NewHandler(s, p, baseURL, trustedSubent, nil)
 	r, err := NewRouter(h)
 	if err != nil {
 		log.Fatal(err)
@@ -53,8 +54,9 @@ func ExampleHandler_ShortenLink() {
 	s := memory.NewStorage(keysLinksUserID, "")
 	var p postgres.Pinger
 	baseURL := "http://localhost:8080"
+	trustedSubnet := ""
 
-	c := NewHandler(s, p, baseURL, nil)
+	c := NewHandler(s, p, baseURL, trustedSubnet, nil)
 	request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(website))
 
 	w := httptest.NewRecorder()

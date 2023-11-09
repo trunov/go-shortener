@@ -40,12 +40,13 @@ func Test_ShortenLink(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			var trustedSubnet string
 			keysLinksUserID := make(map[string]util.MapValue)
 			s := memory.NewStorage(keysLinksUserID, "")
 			var p postgres.Pinger
 			baseURL := "http://localhost:8080"
 
-			c := NewHandler(s, p, baseURL, nil)
+			c := NewHandler(s, p, baseURL, trustedSubnet, nil)
 			request := httptest.NewRequest(http.MethodPost, "/", strings.NewReader(tt.website))
 
 			w := httptest.NewRecorder()
@@ -101,10 +102,10 @@ func Test_GetLink(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			s := memory.NewStorage(tt.keysLinksUserID, "")
 
-			var baseURL string
+			var baseURL, trustedSubnet string
 			var p postgres.Pinger
 
-			c := NewHandler(s, p, baseURL, nil)
+			c := NewHandler(s, p, baseURL, trustedSubnet, nil)
 
 			r, err := NewRouter(c)
 			if err != nil {

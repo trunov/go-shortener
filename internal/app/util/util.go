@@ -39,6 +39,12 @@ type AllURLSResponse struct {
 	OriginalURL string `json:"original_url"`
 }
 
+// InternalStats represents a response containing general statistics for shortener service
+type InternalStats struct {
+	Urls  int `json:"urls"`
+	Users int `json:"users"`
+}
+
 // GenerateRandomString creates a random string of length 8 consisting of alphanumeric characters.
 func GenerateRandomString() string {
 	const length = 8
@@ -111,4 +117,15 @@ func GenerateChannel(shortenURLS []string) chan []string {
 	}()
 
 	return ch
+}
+
+// CountUniqueUsers is helper function for in memory storage GetInternalStats function
+func CountUniqueUsers(m KeysLinksUserID) int {
+	userSet := make(map[string]struct{})
+
+	for _, value := range m {
+		userSet[value.UserID] = struct{}{}
+	}
+
+	return len(userSet)
 }

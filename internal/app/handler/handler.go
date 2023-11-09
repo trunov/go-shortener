@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	_ "net/http/pprof"
 	"strings"
@@ -30,6 +31,7 @@ type Storager interface {
 	AddInBatch(ctx context.Context, br []util.BatchResponse, baseURL string) (string, error)
 	GetShortenKey(ctx context.Context, originalURL string) (string, error)
 	DeleteURLS(ctx context.Context, userID string, shortenURLS []string) error
+	GetInternalStats(ctx context.Context) (util.InternalStats, error)
 }
 
 // Worker is an interface for starting background tasks.
@@ -40,10 +42,11 @@ type Worker interface {
 // Handler contains all the dependencies to handle HTTP requests for
 // the URL shortening application.
 type Handler struct {
-	storage    Storager
-	pinger     postgres.Pinger
-	baseURL    string
-	workerpool Worker
+	storage       Storager
+	pinger        postgres.Pinger
+	baseURL       string
+	trustedSubnet string
+	workerpool    Worker
 }
 
 // BatchRequest represents a single URL shortening request in a batch operation.
@@ -63,8 +66,8 @@ type Response struct {
 }
 
 // NewHandler initializes a new Handler with the provided dependencies.
-func NewHandler(storage Storager, pinger postgres.Pinger, baseURL string, workerpool Worker) *Handler {
-	return &Handler{storage: storage, pinger: pinger, baseURL: baseURL, workerpool: workerpool}
+func NewHandler(storage Storager, pinger postgres.Pinger, baseURL, trustedSubnet string, workerpool Worker) *Handler {
+	return &Handler{storage: storage, pinger: pinger, baseURL: baseURL, trustedSubnet: trustedSubnet, workerpool: workerpool}
 }
 
 // ShortenJSONLink handles the request to shorten a link provided as JSON.
@@ -294,6 +297,48 @@ func (c *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// GetInternalStats return Internal stats of shortener service such as amount of total Urls and Users.
+func (c *Handler) GetInternalStats(w http.ResponseWriter, r *http.Request) {
+	// could be middleware perhaps ?
+	ipStr := r.Header.Get("X-Real-IP")
+	if c.trustedSubnet == "" || ipStr == "" {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	_, ipNet, err := net.ParseCIDR(c.trustedSubnet)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	ok := ipNet.Contains(ip)
+	if !ok {
+		w.WriteHeader(http.StatusForbidden)
+		return
+	}
+
+	ctx := context.Background()
+	stats, err := c.storage.GetInternalStats(ctx)
+
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	if err := json.NewEncoder(w).Encode(stats); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
 // NewRouter sets up and returns a new router with all the URL shortening routes configured.
 func NewRouter(c *Handler) (chi.Router, error) {
 	r := chi.NewRouter()
@@ -321,6 +366,10 @@ func NewRouter(c *Handler) (chi.Router, error) {
 		r.Route("/shorten", func(r chi.Router) {
 			r.Post("/", c.ShortenJSONLink)
 			r.Post("/batch", c.ShortenLinksInBatch)
+		})
+
+		r.Route("/internal", func(r chi.Router) {
+			r.Get("/stats", c.GetInternalStats)
 		})
 	})
 

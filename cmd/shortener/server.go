@@ -22,8 +22,6 @@ import (
 	"github.com/trunov/go-shortener/migrate"
 )
 
-// make a function GracefulShutdown
-
 func StartServer(cfg config.Config) error {
 	var server *http.Server
 	keysAndLinks := make(map[string]util.MapValue)
@@ -63,7 +61,7 @@ func StartServer(cfg config.Config) error {
 	}
 	workerpool := NewWorkerpool(&storage)
 
-	c := handler.NewHandler(storage, pinger, cfg.BaseURL, workerpool)
+	c := handler.NewHandler(storage, pinger, cfg.BaseURL, cfg.TrustedSubnet, workerpool)
 	r, err := handler.NewRouter(c)
 	if err != nil {
 		fmt.Printf("Failed to create router: %v\n", err)

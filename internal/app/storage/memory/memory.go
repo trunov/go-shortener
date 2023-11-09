@@ -125,3 +125,11 @@ func (s *Storage) DeleteURLS(_ context.Context, userID string, shortenURLS []str
 	}
 	return nil
 }
+
+// GetInternalStats return Internal stats of shortener service such as Urls and Users.
+func (s *Storage) GetInternalStats(ctx context.Context) (util.InternalStats, error) {
+	s.mtx.RLock()
+	stats := util.InternalStats{Urls: len(s.keysLinksUserID), Users: util.CountUniqueUsers(s.keysLinksUserID)}
+	s.mtx.RUnlock()
+	return stats, nil
+}
