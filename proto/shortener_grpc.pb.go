@@ -19,7 +19,12 @@ import (
 const _ = grpc.SupportPackageIsVersion7
 
 const (
-	UrlShortener_ShortenLink_FullMethodName = "/shortener.UrlShortener/ShortenLink"
+	UrlShortener_ShortenLink_FullMethodName         = "/shortener.UrlShortener/ShortenLink"
+	UrlShortener_GetURLLink_FullMethodName          = "/shortener.UrlShortener/GetURLLink"
+	UrlShortener_GetUrlsByUserID_FullMethodName     = "/shortener.UrlShortener/GetUrlsByUserID"
+	UrlShortener_DeleteUrls_FullMethodName          = "/shortener.UrlShortener/DeleteUrls"
+	UrlShortener_ShortenLinksInBatch_FullMethodName = "/shortener.UrlShortener/ShortenLinksInBatch"
+	UrlShortener_GetInternalStats_FullMethodName    = "/shortener.UrlShortener/GetInternalStats"
 )
 
 // UrlShortenerClient is the client API for UrlShortener service.
@@ -27,6 +32,11 @@ const (
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type UrlShortenerClient interface {
 	ShortenLink(ctx context.Context, in *ShortenRequest, opts ...grpc.CallOption) (*ShortenResponse, error)
+	GetURLLink(ctx context.Context, in *GetURLRequest, opts ...grpc.CallOption) (*GetURLResponse, error)
+	GetUrlsByUserID(ctx context.Context, in *GetUrlsByUserIDRequest, opts ...grpc.CallOption) (*GetUrlsByUserIDResponse, error)
+	DeleteUrls(ctx context.Context, in *DeleteUrlsRequest, opts ...grpc.CallOption) (*DeleteUrlsResponse, error)
+	ShortenLinksInBatch(ctx context.Context, in *ShortenLinksInBatchRequest, opts ...grpc.CallOption) (*ShortenLinksInBatchResponse, error)
+	GetInternalStats(ctx context.Context, in *GetInternalStatsRequest, opts ...grpc.CallOption) (*GetInternalStatsResponse, error)
 }
 
 type urlShortenerClient struct {
@@ -46,11 +56,61 @@ func (c *urlShortenerClient) ShortenLink(ctx context.Context, in *ShortenRequest
 	return out, nil
 }
 
+func (c *urlShortenerClient) GetURLLink(ctx context.Context, in *GetURLRequest, opts ...grpc.CallOption) (*GetURLResponse, error) {
+	out := new(GetURLResponse)
+	err := c.cc.Invoke(ctx, UrlShortener_GetURLLink_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *urlShortenerClient) GetUrlsByUserID(ctx context.Context, in *GetUrlsByUserIDRequest, opts ...grpc.CallOption) (*GetUrlsByUserIDResponse, error) {
+	out := new(GetUrlsByUserIDResponse)
+	err := c.cc.Invoke(ctx, UrlShortener_GetUrlsByUserID_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *urlShortenerClient) DeleteUrls(ctx context.Context, in *DeleteUrlsRequest, opts ...grpc.CallOption) (*DeleteUrlsResponse, error) {
+	out := new(DeleteUrlsResponse)
+	err := c.cc.Invoke(ctx, UrlShortener_DeleteUrls_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *urlShortenerClient) ShortenLinksInBatch(ctx context.Context, in *ShortenLinksInBatchRequest, opts ...grpc.CallOption) (*ShortenLinksInBatchResponse, error) {
+	out := new(ShortenLinksInBatchResponse)
+	err := c.cc.Invoke(ctx, UrlShortener_ShortenLinksInBatch_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *urlShortenerClient) GetInternalStats(ctx context.Context, in *GetInternalStatsRequest, opts ...grpc.CallOption) (*GetInternalStatsResponse, error) {
+	out := new(GetInternalStatsResponse)
+	err := c.cc.Invoke(ctx, UrlShortener_GetInternalStats_FullMethodName, in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // UrlShortenerServer is the server API for UrlShortener service.
 // All implementations must embed UnimplementedUrlShortenerServer
 // for forward compatibility
 type UrlShortenerServer interface {
 	ShortenLink(context.Context, *ShortenRequest) (*ShortenResponse, error)
+	GetURLLink(context.Context, *GetURLRequest) (*GetURLResponse, error)
+	GetUrlsByUserID(context.Context, *GetUrlsByUserIDRequest) (*GetUrlsByUserIDResponse, error)
+	DeleteUrls(context.Context, *DeleteUrlsRequest) (*DeleteUrlsResponse, error)
+	ShortenLinksInBatch(context.Context, *ShortenLinksInBatchRequest) (*ShortenLinksInBatchResponse, error)
+	GetInternalStats(context.Context, *GetInternalStatsRequest) (*GetInternalStatsResponse, error)
 	mustEmbedUnimplementedUrlShortenerServer()
 }
 
@@ -60,6 +120,21 @@ type UnimplementedUrlShortenerServer struct {
 
 func (UnimplementedUrlShortenerServer) ShortenLink(context.Context, *ShortenRequest) (*ShortenResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method ShortenLink not implemented")
+}
+func (UnimplementedUrlShortenerServer) GetURLLink(context.Context, *GetURLRequest) (*GetURLResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetURLLink not implemented")
+}
+func (UnimplementedUrlShortenerServer) GetUrlsByUserID(context.Context, *GetUrlsByUserIDRequest) (*GetUrlsByUserIDResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetUrlsByUserID not implemented")
+}
+func (UnimplementedUrlShortenerServer) DeleteUrls(context.Context, *DeleteUrlsRequest) (*DeleteUrlsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteUrls not implemented")
+}
+func (UnimplementedUrlShortenerServer) ShortenLinksInBatch(context.Context, *ShortenLinksInBatchRequest) (*ShortenLinksInBatchResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ShortenLinksInBatch not implemented")
+}
+func (UnimplementedUrlShortenerServer) GetInternalStats(context.Context, *GetInternalStatsRequest) (*GetInternalStatsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method GetInternalStats not implemented")
 }
 func (UnimplementedUrlShortenerServer) mustEmbedUnimplementedUrlShortenerServer() {}
 
@@ -92,6 +167,96 @@ func _UrlShortener_ShortenLink_Handler(srv interface{}, ctx context.Context, dec
 	return interceptor(ctx, in, info, handler)
 }
 
+func _UrlShortener_GetURLLink_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetURLRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UrlShortenerServer).GetURLLink(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UrlShortener_GetURLLink_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UrlShortenerServer).GetURLLink(ctx, req.(*GetURLRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UrlShortener_GetUrlsByUserID_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetUrlsByUserIDRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UrlShortenerServer).GetUrlsByUserID(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UrlShortener_GetUrlsByUserID_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UrlShortenerServer).GetUrlsByUserID(ctx, req.(*GetUrlsByUserIDRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UrlShortener_DeleteUrls_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteUrlsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UrlShortenerServer).DeleteUrls(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UrlShortener_DeleteUrls_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UrlShortenerServer).DeleteUrls(ctx, req.(*DeleteUrlsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UrlShortener_ShortenLinksInBatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ShortenLinksInBatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UrlShortenerServer).ShortenLinksInBatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UrlShortener_ShortenLinksInBatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UrlShortenerServer).ShortenLinksInBatch(ctx, req.(*ShortenLinksInBatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _UrlShortener_GetInternalStats_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetInternalStatsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(UrlShortenerServer).GetInternalStats(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: UrlShortener_GetInternalStats_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(UrlShortenerServer).GetInternalStats(ctx, req.(*GetInternalStatsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // UrlShortener_ServiceDesc is the grpc.ServiceDesc for UrlShortener service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -102,6 +267,26 @@ var UrlShortener_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "ShortenLink",
 			Handler:    _UrlShortener_ShortenLink_Handler,
+		},
+		{
+			MethodName: "GetURLLink",
+			Handler:    _UrlShortener_GetURLLink_Handler,
+		},
+		{
+			MethodName: "GetUrlsByUserID",
+			Handler:    _UrlShortener_GetUrlsByUserID_Handler,
+		},
+		{
+			MethodName: "DeleteUrls",
+			Handler:    _UrlShortener_DeleteUrls_Handler,
+		},
+		{
+			MethodName: "ShortenLinksInBatch",
+			Handler:    _UrlShortener_ShortenLinksInBatch_Handler,
+		},
+		{
+			MethodName: "GetInternalStats",
+			Handler:    _UrlShortener_GetInternalStats_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

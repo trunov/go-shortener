@@ -7,6 +7,11 @@ option go_package = "github.com/trunov/go-shortener/internal/app/grpc";
 
 service UrlShortener {
     rpc ShortenLink (ShortenRequest) returns (ShortenResponse);
+    rpc GetURLLink (GetURLRequest) returns (GetURLResponse);
+    rpc GetUrlsByUserID (GetUrlsByUserIDRequest) returns (GetUrlsByUserIDResponse);
+    rpc DeleteUrls (DeleteUrlsRequest) returns (DeleteUrlsResponse);
+    rpc ShortenLinksInBatch (ShortenLinksInBatchRequest) returns (ShortenLinksInBatchResponse);
+    rpc GetInternalStats (GetInternalStatsRequest) returns (GetInternalStatsResponse);
 } 
 
 message ShortenRequest {
@@ -15,4 +20,62 @@ message ShortenRequest {
 
 message ShortenResponse {
     string shortened_url = 1;
+}
+
+message GetURLRequest {
+    string key = 1;
+}
+
+message GetURLResponse {
+    string url = 1;
+}
+
+message GetUrlsByUserIDRequest {
+}
+
+message UrlResponse {
+    string short_url = 1;      
+    string original_url = 2;   
+}
+
+message GetUrlsByUserIDResponse {
+    repeated UrlResponse urls = 1;
+}
+
+message DeleteUrlsRequest {
+    repeated string urls = 1;
+}
+
+
+message DeleteUrlsResponse {
+}
+
+message BatchRequest {
+    string correlation_id = 1;
+    string original_url = 2;
+}
+
+message ShortenLinksInBatchRequest {
+    repeated BatchRequest batch_request = 1;
+}
+
+message BatchResponse {
+    string correlation_id = 1;
+    string short_url = 2;
+    string original_url = 3;
+    string user_id = 4;
+}
+
+message ShortenLinksInBatchResponse{
+    repeated BatchResponse batch_response = 1;
+    string conflict_key = 2;
+}
+
+message GetInternalStatsRequest {
+}
+
+
+message GetInternalStatsResponse {
+    int32 urls = 1;
+    int32 users = 2;
 }

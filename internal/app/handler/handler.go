@@ -169,33 +169,55 @@ func (c *Handler) ShortenLink(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte(finalRes))
 }
 
+func (c *Handler) RetrieveURL(ctx context.Context, key string) (string, bool, error) {
+	v, err := c.storage.Get(ctx, key)
+	if err != nil {
+		return "", false, err
+	}
+
+	if v.IsDeleted {
+		return "", true, nil
+	}
+
+	return v.OriginalURL, false, nil
+}
+
 // GetURLLink redirects the user to the original URL using the shortened key.
 func (c *Handler) GetURLLink(w http.ResponseWriter, r *http.Request) {
 	key := chi.URLParam(r, "key")
-
 	ctx := context.Background()
-	v, err := c.storage.Get(ctx, key)
+
+	originalURL, isDeleted, err := c.RetrieveURL(ctx, key)
 
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusNotFound)
 		return
 	}
 
-	if v.IsDeleted {
+	if isDeleted {
 		w.WriteHeader(http.StatusGone)
 		return
 	}
 
-	w.Header().Set("Location", v.OriginalURL)
+	w.Header().Set("Location", originalURL)
 	w.WriteHeader(http.StatusTemporaryRedirect)
+}
+
+func (c *Handler) RetrieveURLsByUserID(ctx context.Context, userID string) ([]util.AllURLSResponse, error) {
+	allURLsByUserID, err := c.storage.GetAllLinksByUserID(ctx, userID, c.baseURL)
+	if err != nil {
+		return nil, err
+	}
+
+	return allURLsByUserID, nil
 }
 
 // GetUrlsByUserID retrieves all the URLs shortened by a particular user.
 func (c *Handler) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id").(string)
-
 	ctx := context.Background()
-	allURLSByUserID, err := c.storage.GetAllLinksByUserID(ctx, userID, c.baseURL)
+
+	allURLsByUserID, err := c.RetrieveURLsByUserID(ctx, userID)
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -204,28 +226,18 @@ func (c *Handler) GetUrlsByUserID(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if len(allURLSByUserID) == 0 {
+	if len(allURLsByUserID) == 0 {
 		w.WriteHeader(http.StatusNoContent)
 		return
 	}
 
-	if err := json.NewEncoder(w).Encode(allURLSByUserID); err != nil {
+	if err := json.NewEncoder(w).Encode(allURLsByUserID); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 }
 
-// ShortenLinksInBatch handles batch requests to shorten multiple links.
-func (c *Handler) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
-	var batchReq []BatchRequest
-
-	if err := json.NewDecoder(r.Body).Decode(&batchReq); err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
-		return
-	}
-
-	userID := r.Context().Value("user_id").(string)
-
+func (c *Handler) ProcessBatchShortening(ctx context.Context, batchReq []BatchRequest, userID string) ([]util.BatchResponse, string, error) {
 	var batchRes []util.BatchResponse
 
 	for _, v := range batchReq {
@@ -234,34 +246,53 @@ func (c *Handler) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
 		batchRes = append(batchRes, br)
 	}
 
+	k, err := c.storage.AddInBatch(ctx, batchRes, c.baseURL)
+	if err != nil {
+		return batchRes, k, err
+	}
+
+	return batchRes, "", nil
+}
+
+// ShortenLinksInBatch handles batch requests to shorten multiple links.
+func (c *Handler) ShortenLinksInBatch(w http.ResponseWriter, r *http.Request) {
+	var batchReq []BatchRequest
+	if err := json.NewDecoder(r.Body).Decode(&batchReq); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+
+	userID := r.Context().Value("user_id").(string)
+	ctx := context.Background()
+
+	batchRes, k, err := c.ProcessBatchShortening(ctx, batchReq, userID)
 	w.Header().Set("Content-Type", "application/json")
 
-	ctx := context.Background()
-	k, err := c.storage.AddInBatch(ctx, batchRes, c.baseURL)
 	if err != nil {
 		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
 			finalRes := c.baseURL + "/" + k
-
 			w.WriteHeader(http.StatusConflict)
-
 			res := Response{Result: finalRes}
 			if err := json.NewEncoder(w).Encode(res); err != nil {
 				http.Error(w, err.Error(), http.StatusInternalServerError)
 				return
 			}
-			return
 		}
-
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 
 	w.WriteHeader(http.StatusCreated)
-
 	if err := json.NewEncoder(w).Encode(batchRes); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+}
+
+func (c *Handler) ProcessDeletion(ctx context.Context, urls []string, userID string) error {
+	inputCh := util.GenerateChannel(urls)
+	go c.workerpool.Start(ctx, inputCh, userID)
+	return nil
 }
 
 // DeleteHandler handles the request to delete specific shortened links.
@@ -276,8 +307,10 @@ func (c *Handler) DeleteHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	inputCh := util.GenerateChannel(arr)
-	go c.workerpool.Start(ctx, inputCh, userID)
+	if err := c.ProcessDeletion(ctx, arr, userID); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusAccepted)
@@ -299,35 +332,39 @@ func (c *Handler) PingDBHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// GetInternalStats return Internal stats of shortener service such as amount of total Urls and Users.
-func (c *Handler) GetInternalStats(w http.ResponseWriter, r *http.Request) {
-	// could be middleware perhaps ?
-	ipStr := r.Header.Get("X-Real-IP")
+func (c *Handler) CheckClientIP(ipStr string) bool {
 	if c.trustedSubnet == "" || ipStr == "" {
-		w.WriteHeader(http.StatusForbidden)
-		return
+		return false
 	}
 
 	ip := net.ParseIP(ipStr)
 	if ip == nil {
-		w.WriteHeader(http.StatusForbidden)
-		return
+		return false
 	}
 
 	_, ipNet, err := net.ParseCIDR(c.trustedSubnet)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
+		return false
 	}
 
-	ok := ipNet.Contains(ip)
-	if !ok {
+	return ipNet.Contains(ip)
+}
+
+func (c *Handler) RetrieveInternalStats(ctx context.Context) (util.InternalStats, error) {
+	return c.storage.GetInternalStats(ctx)
+}
+
+// GetInternalStats return Internal stats of shortener service such as amount of total Urls and Users.
+func (c *Handler) GetInternalStats(w http.ResponseWriter, r *http.Request) {
+	ipStr := r.Header.Get("X-Real-IP")
+
+	if !c.CheckClientIP(ipStr) {
 		w.WriteHeader(http.StatusForbidden)
 		return
 	}
 
 	ctx := context.Background()
-	stats, err := c.storage.GetInternalStats(ctx)
+	stats, err := c.RetrieveInternalStats(ctx)
 
 	if err != nil {
 		w.WriteHeader(http.StatusInternalServerError)
@@ -337,7 +374,6 @@ func (c *Handler) GetInternalStats(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	if err := json.NewEncoder(w).Encode(stats); err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
 	}
 }
 
