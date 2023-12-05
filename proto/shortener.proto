@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package shortener;
+
+// what's correct go_package ?
+option go_package = "github.com/trunov/go-shortener/internal/app/grpc";
+
+service UrlShortener {
+    rpc ShortenLink (ShortenRequest) returns (ShortenResponse);
+} 
+
+message ShortenRequest {
+    string url = 1;
+}
+
+message ShortenResponse {
+    string shortened_url = 1;
+}

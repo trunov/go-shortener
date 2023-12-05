@@ -18,6 +18,7 @@ const (
 	defaultConfig          = ""
 	defaultEnableHTTPS     = false
 	defaultTrustedSubnet   = ""
+	defaultGrpcPort        = ":50051"
 )
 
 func init() {
@@ -28,6 +29,7 @@ func init() {
 	viper.SetDefault("config", defaultConfig)
 	viper.SetDefault("enable_https", defaultEnableHTTPS)
 	viper.SetDefault("trusted_subnet", defaultTrustedSubnet)
+	viper.SetDefault("grpc_port", defaultGrpcPort)
 }
 
 // Config represents the configuration with BaseURL, ServerAddress, FileStoragePath, DatabaseDSN and EnableHTTPS
@@ -38,6 +40,7 @@ type Config struct {
 	DatabaseDSN     string
 	EnableHTTPS     bool
 	TrustedSubnet   string
+	GRPCPort        string
 }
 
 func bindToFlag() {
@@ -48,6 +51,7 @@ func bindToFlag() {
 	pflag.StringP("config", "c", defaultConfig, "config file path")
 	pflag.BoolP("enable_https", "s", defaultEnableHTTPS, "enable HTTPS")
 	pflag.StringP("trusted_subnet", "t", defaultTrustedSubnet, "trusted subnet")
+	pflag.StringP("grpc_port", "g", defaultGrpcPort, "default grpc port")
 
 	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
 	pflag.Parse()
@@ -82,6 +86,7 @@ func bindToEnv() {
 	viper.BindEnv("config", "CONFIG")
 	viper.BindEnv("enable_https", "ENABLE_HTTPS")
 	viper.BindEnv("trusted_subnet", "TRUSTED_SUBNET")
+	viper.BindEnv("grpc_port", "DEFAULT_GRPC_PORT")
 }
 
 // ReadConfig reads the configuration from environment variables, flags and json config file.
@@ -100,6 +105,7 @@ func ReadConfig() (Config, error) {
 		DatabaseDSN:     viper.GetString("database_dsn"),
 		EnableHTTPS:     viper.GetBool("enable_https"),
 		TrustedSubnet:   viper.GetString("trusted_subnet"),
+		GRPCPort:        viper.GetString("grpc_port"),
 	}
 
 	return res, nil

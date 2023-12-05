@@ -5,7 +5,6 @@ import (
 	"context"
 	"crypto/aes"
 	"encoding/json"
-	"fmt"
 	"io"
 	"net"
 	"net/http"
@@ -121,6 +120,29 @@ func (c *Handler) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+// core_logic
+// I think it would be correct to just return error
+func (c *Handler) ProcessShortenLink(url, userID string) (string, int, error) {
+	key := util.GenerateRandomString()
+	ctx := context.Background()
+	err := c.storage.Add(ctx, key, url, userID)
+
+	if err != nil {
+		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
+			k, err := c.storage.GetShortenKey(ctx, url)
+			if err != nil {
+				return "", http.StatusInternalServerError, err
+			}
+			finalRes := c.baseURL + "/" + k
+			return finalRes, http.StatusConflict, nil
+		}
+		return "", http.StatusInternalServerError, err
+	}
+
+	finalRes := c.baseURL + "/" + key
+	return finalRes, http.StatusCreated, nil
+}
+
 // ShortenLink handles the request to shorten a link provided as plain text.
 func (c *Handler) ShortenLink(w http.ResponseWriter, r *http.Request) {
 	b, err := io.ReadAll(r.Body)
@@ -130,40 +152,20 @@ func (c *Handler) ShortenLink(w http.ResponseWriter, r *http.Request) {
 	}
 
 	userID, ok := r.Context().Value("user_id").(string)
-
-	// without ok check first test was failing
 	if !ok {
-		fmt.Println("")
-	}
-
-	key := util.GenerateRandomString()
-
-	ctx := context.Background()
-	err = c.storage.Add(ctx, key, string(b), userID)
-
-	w.Header().Set("Content-Type", "plain/text")
-
-	if err != nil {
-		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
-			k, err := c.storage.GetShortenKey(ctx, string(b))
-			if err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-			finalRes := c.baseURL + "/" + k
-
-			w.WriteHeader(http.StatusConflict)
-			w.Write([]byte(finalRes))
-			return
-		}
-
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		http.Error(w, "user ID not found", http.StatusBadRequest)
 		return
 	}
 
-	w.WriteHeader(http.StatusCreated)
+	finalRes, statusCode, err := c.ProcessShortenLink(string(b), userID)
 
-	finalRes := c.baseURL + "/" + key
+	w.Header().Set("Content-Type", "plain/text")
+	if err != nil {
+		http.Error(w, err.Error(), statusCode)
+		return
+	}
+
+	w.WriteHeader(statusCode)
 	w.Write([]byte(finalRes))
 }
 

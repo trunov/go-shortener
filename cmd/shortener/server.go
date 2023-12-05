@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/aes"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,9 +14,14 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"golang.org/x/crypto/acme/autocert"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
+	pb "github.com/trunov/go-shortener/proto"
 
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
+	"github.com/trunov/go-shortener/internal/app/grpcService"
 	"github.com/trunov/go-shortener/internal/app/handler"
 	"github.com/trunov/go-shortener/internal/app/storage/memory"
 	"github.com/trunov/go-shortener/internal/app/storage/postgres"
@@ -100,6 +107,30 @@ func StartServer(cfg config.Config) error {
 
 	log.Println("server is starting on port ", cfg.ServerAddress)
 
+	lis, err := net.Listen("tcp", cfg.GRPCPort)
+	if err != nil {
+		log.Fatalf("failed to listen on gRPC port: %v", err)
+	}
+
+	key, err := util.GenerateRandom(2 * aes.BlockSize)
+	if err != nil {
+		return err
+	}
+
+	gs := grpc.NewServer(grpc.UnaryInterceptor(grpcService.AuthInterceptor(key)))
+	newGrpc := grpcService.NewGrpcServer(c)
+
+	pb.RegisterUrlShortenerServer(gs, &newGrpc)
+
+	reflection.Register(gs)
+
+	go func() {
+		log.Printf("gRPC server is listening on port %s", cfg.GRPCPort)
+		if err := gs.Serve(lis); err != nil {
+			log.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+
 	<-done
 	log.Print("Shutdown signal received")
 
@@ -109,6 +140,9 @@ func StartServer(cfg config.Config) error {
 	if err := server.Shutdown(ctxShutdown); err != nil && err != http.ErrServerClosed {
 		log.Printf("HTTP server Shutdown: %v", err)
 	}
+
+	gs.GracefulStop()
+	log.Print("gRPC server stopped")
 
 	// Finish processing ongoing work and stop the worker pool.
 	workerpool.Stop()
