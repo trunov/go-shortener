@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4/pgxpool"
+	"golang.org/x/crypto/acme/autocert"
 
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
@@ -24,6 +25,7 @@ import (
 // make a function GracefulShutdown
 
 func StartServer(cfg config.Config) error {
+	var server *http.Server
 	keysAndLinks := make(map[string]util.MapValue)
 	ctx := context.Background()
 
@@ -68,9 +70,24 @@ func StartServer(cfg config.Config) error {
 		return err
 	}
 
-	server := &http.Server{
-		Addr:    cfg.ServerAddress,
-		Handler: r,
+	if cfg.EnableHTTPS {
+		manager := &autocert.Manager{
+			Cache:      autocert.DirCache("cache-dir"),
+			Prompt:     autocert.AcceptTOS,
+			HostPolicy: autocert.HostWhitelist("myshortener.ru", "www.myshortener.ru"),
+		}
+
+		server = &http.Server{
+			Addr:      cfg.ServerAddress,
+			Handler:   r,
+			TLSConfig: manager.TLSConfig(),
+		}
+
+	} else {
+		server = &http.Server{
+			Addr:    cfg.ServerAddress,
+			Handler: r,
+		}
 	}
 
 	done := make(chan os.Signal, 1)
@@ -86,19 +103,24 @@ func StartServer(cfg config.Config) error {
 	log.Println("server is starting on port ", cfg.ServerAddress)
 
 	<-done
-	log.Print("Server Stopped")
+	log.Print("Shutdown signal received")
 
+	// Stop accepting new requests.
 	ctxShutdown, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-
-	if err := server.Shutdown(ctxShutdown); err != nil {
-		return err
+	if err := server.Shutdown(ctxShutdown); err != nil && err != http.ErrServerClosed {
+		log.Printf("HTTP server Shutdown: %v", err)
 	}
-	log.Print("Server Exited Properly")
 
+	// Finish processing ongoing work and stop the worker pool.
+	workerpool.Stop()
+
+	// Close database connections.
 	if dbpool != nil {
 		dbpool.Close()
 	}
+
+	log.Print("Server and Workerpool Gracefully Stopped")
 
 	return nil
 }

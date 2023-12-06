@@ -1,36 +1,100 @@
-// Package config allows you to read config from local calls or flags from the terminal.
+// Package config allows you to read config from local calls, flags from the terminal or json config file.
 package config
 
 import (
+	"errors"
 	"flag"
+	"fmt"
 
-	"github.com/caarlos0/env/v6"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
-// Config represents the configuration with BaseURL, ServerAddress, FileStoragePath, and DatabaseDSN.
-type Config struct {
-	BaseURL         string `env:"BASE_URL" envDefault:"http://localhost:8080"`
-	ServerAddress   string `env:"SERVER_ADDRESS" envDefault:"localhost:8080"`
-	FileStoragePath string `env:"FILE_STORAGE_PATH"`
-	DatabaseDSN     string `env:"DATABASE_DSN"`
+const (
+	defaultBaseURL         = "http://localhost:8080"
+	defaultServerAddress   = "localhost:8080"
+	defaultFileStoragePath = ""
+	defaultDatabaseDSN     = ""
+	defaultConfig          = ""
+	defaultEnableHTTPS     = false
+)
+
+func init() {
+	viper.SetDefault("base_url", defaultBaseURL)
+	viper.SetDefault("server_address", defaultServerAddress)
+	viper.SetDefault("file_storage_path", defaultFileStoragePath)
+	viper.SetDefault("database_dsn", defaultDatabaseDSN)
+	viper.SetDefault("config", defaultConfig)
+	viper.SetDefault("enable_https", defaultEnableHTTPS)
 }
 
-// ReadConfig reads the configuration from environment variables and flags.
-func ReadConfig() (Config, error) {
-	cfgEnv := Config{}
+// Config represents the configuration with BaseURL, ServerAddress, FileStoragePath, DatabaseDSN and EnableHTTPS
+type Config struct {
+	BaseURL         string
+	ServerAddress   string
+	FileStoragePath string
+	DatabaseDSN     string
+	EnableHTTPS     bool
+}
 
-	if err := env.Parse(&cfgEnv); err != nil {
-		return cfgEnv, err
+func bindToFlag() {
+	pflag.StringP("base_url", "b", defaultBaseURL, "base URL")
+	pflag.StringP("server_address", "a", defaultServerAddress, "server address")
+	pflag.StringP("file_storage_path", "f", defaultFileStoragePath, "file storage path")
+	pflag.StringP("database_dsn", "d", defaultDatabaseDSN, "database DSN")
+	pflag.StringP("config", "c", defaultConfig, "config file path")
+	pflag.BoolP("enable_https", "s", defaultEnableHTTPS, "enable HTTPS")
+
+	pflag.CommandLine.AddGoFlagSet(flag.CommandLine)
+	pflag.Parse()
+	_ = viper.BindPFlags(pflag.CommandLine)
+}
+
+func readJSONConfigFile() error {
+	configPath := viper.GetString("config")
+	// ignore if empty
+	if configPath == "" {
+		return nil
 	}
 
-	cfgFlag := Config{}
+	fmt.Println(configPath)
 
-	flag.StringVar(&cfgFlag.BaseURL, "b", cfgEnv.BaseURL, "base URL")
-	flag.StringVar(&cfgFlag.ServerAddress, "a", cfgEnv.ServerAddress, "server address")
-	flag.StringVar(&cfgFlag.FileStoragePath, "f", cfgEnv.FileStoragePath, "file storage path")
-	flag.StringVar(&cfgFlag.DatabaseDSN, "d", "", "database DSN")
+	viper.SetConfigFile(configPath)
+	err := viper.ReadInConfig()
+	if err != nil {
+		if _, ok := err.(viper.ConfigFileNotFoundError); ok {
+			return errors.New("config file not found")
+		}
+		return err
+	}
+	return nil
+}
 
-	flag.Parse()
+func bindToEnv() {
+	viper.BindEnv("base_url", "BASE_URL")
+	viper.BindEnv("server_address", "SERVER_ADDRESS")
+	viper.BindEnv("file_storage_path", "FILE_STORAGE_PATH")
+	viper.BindEnv("database_dsn", "DATABASE_DSN")
+	viper.BindEnv("config", "CONFIG")
+	viper.BindEnv("enable_https", "ENABLE_HTTPS")
+}
 
-	return cfgFlag, nil
+// ReadConfig reads the configuration from environment variables, flags and json config file.
+func ReadConfig() (Config, error) {
+	bindToFlag()
+	bindToEnv()
+	err := readJSONConfigFile()
+	if err != nil {
+		return Config{}, err
+	}
+
+	res := Config{
+		BaseURL:         viper.GetString("base_url"),
+		ServerAddress:   viper.GetString("server_address"),
+		FileStoragePath: viper.GetString("file_storage_path"),
+		DatabaseDSN:     viper.GetString("database_dsn"),
+		EnableHTTPS:     viper.GetBool("enable_https"),
+	}
+
+	return res, nil
 }
