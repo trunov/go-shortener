@@ -2,10 +2,10 @@
 package util
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"math/rand"
-	"time"
+	"math/big"
 )
 
 // KeysLinksUserID is a mapping of short URLs to their corresponding MapValue.
@@ -46,18 +46,20 @@ type InternalStats struct {
 }
 
 // GenerateRandomString creates a random string of length 8 consisting of alphanumeric characters.
-func GenerateRandomString() string {
+func GenerateRandomString() (string, error) {
 	const length = 8
-	rand.Seed(time.Now().UnixNano())
-
 	possibleRunes := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
 	r := make([]rune, length)
 
 	for i := range r {
-		r[i] = possibleRunes[rand.Intn(len(possibleRunes))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(possibleRunes))))
+		if err != nil {
+			return "", err
+		}
+		r[i] = possibleRunes[n.Int64()]
 	}
 
-	return string(r)
+	return string(r), nil
 }
 
 // GenerateRandomUserID produces a random base64 encoded userID.
