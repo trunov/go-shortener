@@ -21,7 +21,6 @@ var userIDKey = &contextKey{"user-id"}
 
 type grpcServer struct {
 	pb.UnimplementedUrlShortenerServer
-	// should be business logic not handler
 	handler *handler.Handler
 }
 
