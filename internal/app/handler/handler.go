@@ -80,10 +80,14 @@ func (c *Handler) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 
 	userID := r.Context().Value("user_id").(string)
 
-	key := util.GenerateRandomString()
+	key, err := util.GenerateRandomString()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
 
 	ctx := context.Background()
-	err := c.storage.Add(ctx, key, req.URL, userID)
+	err = c.storage.Add(ctx, key, req.URL, userID)
 
 	w.Header().Set("Content-Type", "application/json")
 
@@ -123,9 +127,13 @@ func (c *Handler) ShortenJSONLink(w http.ResponseWriter, r *http.Request) {
 // core_logic
 // I think it would be correct to just return error
 func (c *Handler) ProcessShortenLink(url, userID string) (string, int, error) {
-	key := util.GenerateRandomString()
+	key, err := util.GenerateRandomString()
+	if err != nil {
+		return "", http.StatusInternalServerError, err
+	}
+
 	ctx := context.Background()
-	err := c.storage.Add(ctx, key, url, userID)
+	err = c.storage.Add(ctx, key, url, userID)
 
 	if err != nil {
 		if strings.Contains(err.Error(), pgerrcode.UniqueViolation) || strings.Contains(err.Error(), "found entry") {
@@ -241,7 +249,11 @@ func (c *Handler) ProcessBatchShortening(ctx context.Context, batchReq []BatchRe
 	var batchRes []util.BatchResponse
 
 	for _, v := range batchReq {
-		key := util.GenerateRandomString()
+		key, err := util.GenerateRandomString()
+		if err != nil {
+			return batchRes, "", err
+		}
+
 		br := util.BatchResponse{CorrelationID: v.CorrelationID, ShortURL: c.baseURL + "/" + key, OriginalURL: v.OriginalURL, UserID: userID}
 		batchRes = append(batchRes, br)
 	}

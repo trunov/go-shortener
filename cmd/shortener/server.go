@@ -21,7 +21,7 @@ import (
 
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
-	"github.com/trunov/go-shortener/internal/app/grpcService"
+	"github.com/trunov/go-shortener/internal/app/grpcservice"
 	"github.com/trunov/go-shortener/internal/app/handler"
 	"github.com/trunov/go-shortener/internal/app/storage/memory"
 	"github.com/trunov/go-shortener/internal/app/storage/postgres"
@@ -117,8 +117,8 @@ func StartServer(cfg config.Config) error {
 		return err
 	}
 
-	gs := grpc.NewServer(grpc.UnaryInterceptor(grpcService.AuthInterceptor(key)))
-	newGrpc := grpcService.NewGrpcServer(c)
+	gs := grpc.NewServer(grpc.UnaryInterceptor(grpcservice.AuthInterceptor(key)))
+	newGrpc := grpcservice.NewGrpcServer(c)
 
 	pb.RegisterUrlShortenerServer(gs, &newGrpc)
 
