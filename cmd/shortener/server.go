@@ -21,7 +21,7 @@ import (
 
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
-	"github.com/trunov/go-shortener/internal/app/grpcservice"
+	grpcservice "github.com/trunov/go-shortener/internal/app/grpc_service"
 	"github.com/trunov/go-shortener/internal/app/handler"
 	"github.com/trunov/go-shortener/internal/app/storage/memory"
 	"github.com/trunov/go-shortener/internal/app/storage/postgres"
