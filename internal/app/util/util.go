@@ -2,10 +2,10 @@
 package util
 
 import (
+	"crypto/rand"
 	"encoding/base64"
 	"fmt"
-	"math/rand"
-	"time"
+	"math/big"
 )
 
 // KeysLinksUserID is a mapping of short URLs to their corresponding MapValue.
@@ -39,19 +39,27 @@ type AllURLSResponse struct {
 	OriginalURL string `json:"original_url"`
 }
 
-// GenerateRandomString creates a random string of length 8 consisting of alphanumeric characters.
-func GenerateRandomString() string {
-	const length = 8
-	rand.Seed(time.Now().UnixNano())
+// InternalStats represents a response containing general statistics for shortener service
+type InternalStats struct {
+	Urls  int `json:"urls"`
+	Users int `json:"users"`
+}
 
+// GenerateRandomString creates a random string of length 8 consisting of alphanumeric characters.
+func GenerateRandomString() (string, error) {
+	const length = 8
 	possibleRunes := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ1234567890")
 	r := make([]rune, length)
 
 	for i := range r {
-		r[i] = possibleRunes[rand.Intn(len(possibleRunes))]
+		n, err := rand.Int(rand.Reader, big.NewInt(int64(len(possibleRunes))))
+		if err != nil {
+			return "", err
+		}
+		r[i] = possibleRunes[n.Int64()]
 	}
 
-	return string(r)
+	return string(r), nil
 }
 
 // GenerateRandomUserID produces a random base64 encoded userID.
@@ -111,4 +119,15 @@ func GenerateChannel(shortenURLS []string) chan []string {
 	}()
 
 	return ch
+}
+
+// CountUniqueUsers is helper function for in memory storage GetInternalStats function
+func CountUniqueUsers(m KeysLinksUserID) int {
+	userSet := make(map[string]struct{})
+
+	for _, value := range m {
+		userSet[value.UserID] = struct{}{}
+	}
+
+	return len(userSet)
 }

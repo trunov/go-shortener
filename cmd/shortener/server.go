@@ -2,8 +2,10 @@ package main
 
 import (
 	"context"
+	"crypto/aes"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,17 +14,20 @@ import (
 
 	"github.com/jackc/pgx/v4/pgxpool"
 	"golang.org/x/crypto/acme/autocert"
+	"google.golang.org/grpc"
+	"google.golang.org/grpc/reflection"
+
+	pb "github.com/trunov/go-shortener/proto"
 
 	"github.com/trunov/go-shortener/internal/app/config"
 	"github.com/trunov/go-shortener/internal/app/file"
+	grpcservice "github.com/trunov/go-shortener/internal/app/grpc_service"
 	"github.com/trunov/go-shortener/internal/app/handler"
 	"github.com/trunov/go-shortener/internal/app/storage/memory"
 	"github.com/trunov/go-shortener/internal/app/storage/postgres"
 	"github.com/trunov/go-shortener/internal/app/util"
 	"github.com/trunov/go-shortener/migrate"
 )
-
-// make a function GracefulShutdown
 
 func StartServer(cfg config.Config) error {
 	var server *http.Server
@@ -63,7 +68,7 @@ func StartServer(cfg config.Config) error {
 	}
 	workerpool := NewWorkerpool(&storage)
 
-	c := handler.NewHandler(storage, pinger, cfg.BaseURL, workerpool)
+	c := handler.NewHandler(storage, pinger, cfg.BaseURL, cfg.TrustedSubnet, workerpool)
 	r, err := handler.NewRouter(c)
 	if err != nil {
 		fmt.Printf("Failed to create router: %v\n", err)
@@ -102,6 +107,30 @@ func StartServer(cfg config.Config) error {
 
 	log.Println("server is starting on port ", cfg.ServerAddress)
 
+	lis, err := net.Listen("tcp", cfg.GRPCPort)
+	if err != nil {
+		log.Fatalf("failed to listen on gRPC port: %v", err)
+	}
+
+	key, err := util.GenerateRandom(2 * aes.BlockSize)
+	if err != nil {
+		return err
+	}
+
+	gs := grpc.NewServer(grpc.UnaryInterceptor(grpcservice.AuthInterceptor(key)))
+	newGrpc := grpcservice.NewGrpcServer(c)
+
+	pb.RegisterUrlShortenerServer(gs, &newGrpc)
+
+	reflection.Register(gs)
+
+	go func() {
+		log.Printf("gRPC server is listening on port %s", cfg.GRPCPort)
+		if err := gs.Serve(lis); err != nil {
+			log.Fatalf("failed to serve gRPC: %v", err)
+		}
+	}()
+
 	<-done
 	log.Print("Shutdown signal received")
 
@@ -111,6 +140,9 @@ func StartServer(cfg config.Config) error {
 	if err := server.Shutdown(ctxShutdown); err != nil && err != http.ErrServerClosed {
 		log.Printf("HTTP server Shutdown: %v", err)
 	}
+
+	gs.GracefulStop()
+	log.Print("gRPC server stopped")
 
 	// Finish processing ongoing work and stop the worker pool.
 	workerpool.Stop()
